@@ -15,38 +15,16 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package cmd
+package debugger
 
-import (
-	"github.com/spf13/cobra"
+import "net/http"
 
-	"github.com/polarismesh/polaris-sidecar/pkg/log"
-)
-
-var (
-	rootCmd = &cobra.Command{
-		Use:          "polaris-sidecar",
-		Short:        "polaris sidecar",
-		Long:         "polaris sidecar",
-		SilenceUsage: true,
-	}
-)
-
-/**
- * @brief 初始化命令行工具
- */
-func init() {
-	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(versionCmd)
+type DebugHandler struct {
+	Path    string
+	Handler http.HandlerFunc
 }
 
-/**
- * @brief 执行命令行解析
- */
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		log.Errorf("root cmd execute error: %v", err)
-		return
-	}
+type DebugConfig struct {
+	Enable bool  `yaml:"enable"`
+	Port   int32 `yaml:"port"`
 }

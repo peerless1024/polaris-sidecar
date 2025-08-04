@@ -22,14 +22,16 @@ import (
 )
 
 const (
-	DefaultLoggerName         = "default"
-	defaultOutputLevel        = InfoLevel
-	defaultStacktraceLevel    = NoneLevel
-	defaultOutputPath         = "stdout"
-	defaultErrorOutputPath    = "stderr"
-	defaultRotationMaxAge     = 7
-	defaultRotationMaxSize    = 100
-	defaultRotationMaxBackups = 10
+	DefaultLoggerName            = "default"
+	defaultOutputLevel           = InfoLevel
+	defaultStacktraceLevel       = NoneLevel
+	defaultOutputPath            = "stdout"
+	defaultErrorOutputPath       = "stderr"
+	defaultRotateOutputPath      = "logs/polaris-sidecar.log"
+	defaultErrorRotateOutputPath = "logs/polaris-sidecar-error.log"
+	defaultRotationMaxAge        = 7
+	defaultRotationMaxSize       = 100
+	defaultRotationMaxBackups    = 10
 )
 
 // Level is an enumeration of all supported log levels.
@@ -128,13 +130,15 @@ type Options struct {
 // DefaultOptions returns a new set of options, initialized to the defaults
 func DefaultOptions() *Options {
 	return &Options{
-		OutputPaths:        []string{defaultOutputPath},
-		ErrorOutputPaths:   []string{defaultErrorOutputPath},
-		RotationMaxSize:    defaultRotationMaxSize,
-		RotationMaxAge:     defaultRotationMaxAge,
-		RotationMaxBackups: defaultRotationMaxBackups,
-		OutputLevel:        levelToString[defaultOutputLevel],
-		StacktraceLevel:    levelToString[defaultStacktraceLevel],
+		OutputPaths:           []string{defaultOutputPath},
+		ErrorOutputPaths:      []string{defaultErrorOutputPath},
+		RotateOutputPath:      defaultRotateOutputPath,
+		ErrorRotateOutputPath: defaultErrorRotateOutputPath,
+		RotationMaxSize:       defaultRotationMaxSize,
+		RotationMaxAge:        defaultRotationMaxAge,
+		RotationMaxBackups:    defaultRotationMaxBackups,
+		OutputLevel:           levelToString[defaultOutputLevel],
+		StacktraceLevel:       levelToString[defaultStacktraceLevel],
 	}
 }
 

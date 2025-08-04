@@ -1,0 +1,35 @@
+package config
+
+const (
+	EnvPolarisAddress                  = "POLARIS_ADDRESS"
+	EnvSidecarBind                     = "SIDECAR_BIND"
+	EnvSidecarPort                     = "SIDECAR_PORT"
+	EnvSidecarNamespace                = "SIDECAR_NAMESPACE"
+	EnvSidecarRecurseEnable            = "SIDECAR_RECURSE_ENABLE"
+	EnvSidecarRecurseTimeout           = "SIDECAR_RECURSE_TIMEOUT"
+	EnvSidecarLogRotateOutputPath      = "SIDECAR_LOG_ROTATE_OUTPUT_PATH"
+	EnvSidecarLogErrorRotateOutputPath = "SIDECAR_LOG_ERROR_ROTATE_OUTPUT_PATH"
+	EnvSidecarLogRotationMaxSize       = "SIDECAR_LOG_ROTATION_MAX_SIZE"
+	EnvSidecarLogRotationMaxBackups    = "SIDECAR_LOG_ROTATION_MAX_BACKUPS"
+	EnvSidecarLogRotationMaxAge        = "SIDECAR_LOG_ROTATION_MAX_AGE"
+	EnvSidecarLogLevel                 = "SIDECAR_LOG_LEVEL"
+	EnvSidecarDnsTtl                   = "SIDECAR_DNS_TTL"
+	EnvSidecarDnsEnable                = "SIDECAR_DNS_ENABLE"
+	EnvSidecarDnsSuffix                = "SIDECAR_DNS_SUFFIX"
+	EnvSidecarDnsRouteLabels           = "SIDECAR_DNS_ROUTE_LABELS"
+	EnvSidecarMeshTtl                  = "SIDECAR_MESH_TTL"
+	EnvSidecarMeshEnable               = "SIDECAR_MESH_ENABLE"
+	EnvSidecarMeshReloadInterval       = "SIDECAR_MESH_RELOAD_INTERVAL"
+	EnvSidecarMeshAnswerIp             = "SIDECAR_MESH_ANSWER_IP"
+	EnvSidecarMtlsEnable               = "SIDECAR_MTLS_ENABLE"
+	EnvSidecarMtlsCAServer             = "SIDECAR_MTLS_CA_SERVER"
+	EnvSidecarRLSEnable                = "SIDECAR_RLS_ENABLE"
+	EnvSidecarMetricEnable             = "SIDECAR_METRIC_ENABLE"
+	EnvSidecarMetricListenPort         = "SIDECAR_METRIC_LISTEN_PORT"
+)
+
+const (
+	labelSep         = ","
+	kvSep            = ":"
+	defaultSvcSuffix = "."
+)

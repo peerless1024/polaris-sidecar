@@ -5,11 +5,18 @@ set -e
 if [ $# -gt 0 ]; then
   version="$1"
 else
-  current=`date "+%Y-%m-%d %H:%M:%S"`
-  timeStamp=`date -d "$current" +%s`
-  currentTimeStamp=$(((timeStamp*1000+10#`date "+%N"`/1000000)/1000))
-  version="$currentTimeStamp"
+  # MacOS compatible timestamp generation
+  if [[ "$(uname)" == "Darwin" ]]; then
+    currentTimeStamp=$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date '+%Y-%m-%d %H:%M:%S')" +%s)
+    version="${currentTimeStamp}"
+  else
+    current=`date "+%Y-%m-%d %H:%M:%S"`
+    timeStamp=`date -d "$current" +%s`
+    currentTimeStamp=$(((timeStamp*1000+10#`date "+%N"`/1000000)/1000))
+    version="$currentTimeStamp"
+  fi
 fi
+
 workdir=$(dirname $(realpath $0))
 bin_name="polaris-sidecar"
 if [ "${GOOS}" == "" ]; then

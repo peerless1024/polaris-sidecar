@@ -1,5 +1,3 @@
-polaris/
-
 .idea/
 
 vendor/*
@@ -19,3 +17,6 @@ logs/
 
 style_tool/
 goimports-reviser
+
+polaris-sidecar-release_*
+log/

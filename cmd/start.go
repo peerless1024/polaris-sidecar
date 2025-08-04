@@ -21,8 +21,8 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/polarismesh/polaris-sidecar/bootstrap"
-	"github.com/polarismesh/polaris-sidecar/bootstrap/config"
+	"github.com/polarismesh/polaris-sidecar/internal/bootstrap"
+	"github.com/polarismesh/polaris-sidecar/internal/bootstrap/config"
 )
 
 var (

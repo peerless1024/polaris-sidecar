@@ -15,38 +15,14 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package cmd
+package system
 
 import (
-	"github.com/spf13/cobra"
-
-	"github.com/polarismesh/polaris-sidecar/pkg/log"
+	"os"
+	"syscall"
 )
 
-var (
-	rootCmd = &cobra.Command{
-		Use:          "polaris-sidecar",
-		Short:        "polaris sidecar",
-		Long:         "polaris sidecar",
-		SilenceUsage: true,
-	}
-)
-
-/**
- * @brief 初始化命令行工具
- */
-func init() {
-	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(versionCmd)
-}
-
-/**
- * @brief 执行命令行解析
- */
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		log.Errorf("root cmd execute error: %v", err)
-		return
-	}
+var Signals = []os.Signal{
+	syscall.SIGINT, syscall.SIGTERM,
+	syscall.SIGSEGV,
 }

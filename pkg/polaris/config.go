@@ -15,38 +15,29 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package cmd
+package polaris
 
 import (
-	"github.com/spf13/cobra"
+	"time"
 
-	"github.com/polarismesh/polaris-sidecar/pkg/log"
+	"github.com/polarismesh/polaris-go/pkg/config"
 )
 
-var (
-	rootCmd = &cobra.Command{
-		Use:          "polaris-sidecar",
-		Short:        "polaris sidecar",
-		Long:         "polaris sidecar",
-		SilenceUsage: true,
-	}
-)
-
-/**
- * @brief 初始化命令行工具
- */
-func init() {
-	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(versionCmd)
+type Config struct {
+	Addresses          []string `yaml:"addresses"`
+	Metrics            *Metrics
+	LocationConfigImpl *config.LocationConfigImpl
 }
 
-/**
- * @brief 执行命令行解析
- */
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		log.Errorf("root cmd execute error: %v", err)
-		return
-	}
+type Metrics struct {
+	// port listen for metric message
+	Port int `yaml:"port"`
+	// Type metrics data report type pull/push
+	Type string `yaml:"type"`
+	// IP if use pull, need open Prometheus HttpServer
+	IP string `yaml:"-"`
+	// Interval if use push, need set report interval metrics data to pushgateway
+	Interval time.Duration `yaml:"interval"`
+	// Address if use push, need set report metrics data to pushgateway server
+	Address string `yaml:"address"`
 }

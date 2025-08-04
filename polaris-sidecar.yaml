@@ -13,7 +13,7 @@ debugger:
   enable: false
   port: 30000
 polaris:
-  addresses: 
+  addresses:
     - ${POLARIS_ADDRESS}
   # 地址提供插件，用于获取当前SDK所在的地域信息
   location:
@@ -29,26 +29,27 @@ polaris:
 bind: 0.0.0.0
 port: 53
 namespace: default
-recurse:
+recurse: # 是否递归查询
   enable: false
   timeoutSec: 1
-mtls:
-  enable: false
-metrics:
-  enable: true
-  type: pull
-  metricPort: 0
-ratelimit:
-  enable: true
-  network: unix
+mesh:
+  mtls: # mesh模式下，是否开启mtls
+    enable: false
+  metrics: # mesh模式下，是否开启metrics
+    enable: false
+    type: pull
+    metricPort: 0
+  ratelimit: # mesh模式下，是否开启ratelimit
+    enable: false
+    network: unix
 resolvers:
-  - name: dnsagent
+  - name: dnsagent # 默认dnsagent
     dns_ttl: 10
     enable: true
     suffix: "."
-    # option:
-    #   route_labels: "key:value,key:value"
-  - name: meshproxy
+    option:
+      route_labels: "key1:value1,key2:value2"
+  - name: meshproxy # mesh模式
     dns_ttl: 120
     enable: false
     option:

@@ -7,8 +7,8 @@ Fixes #
 - [ ] Docs
 - [ ] Installation
 - [ ] Performance and Scalability
-- [ ] Naming
-- [ ] HealthCheck
+- [ ] DNS Agent Mode
+- [ ] Mesh Proxy Mode
 - [ ] Test and Release
 
 **Please check any characteristics that apply to this pull request.**
