@@ -19,8 +19,6 @@ package main
 
 import (
 	"github.com/polarismesh/polaris-sidecar/cmd"
-	_ "github.com/polarismesh/polaris-sidecar/resolver/dnsagent"
-	_ "github.com/polarismesh/polaris-sidecar/resolver/meshproxy"
 )
 
 // main entry

@@ -62,7 +62,7 @@ func (s *DebugServer) Run(ctx context.Context, errChan chan error) {
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	serveErr := make(chan error, 1)
 	go func() {
-		if err = s.svr.Serve(ln); err != nil && !errors.Is(http.ErrServerClosed, err) {
+		if err = s.svr.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Errorf("start debug server failed: %v", err)
 			serveErr <- err
 			return

@@ -29,16 +29,16 @@ import (
 	"go.uber.org/zap"
 
 	debughttp "github.com/polarismesh/polaris-sidecar/internal/debugger"
-	resolver2 "github.com/polarismesh/polaris-sidecar/internal/resolver"
+	"github.com/polarismesh/polaris-sidecar/internal/resolver"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 	polarisApi "github.com/polarismesh/polaris-sidecar/pkg/polaris"
 )
 
 func init() {
-	resolver2.Register(&resolverDiscovery{})
+	resolver.Register(&resolverDiscovery{})
 }
 
-const name = resolver2.PluginNameDnsAgent
+const name = resolver.PluginNameDnsAgent
 
 type resolverDiscovery struct {
 	consumer  polaris.ConsumerAPI
@@ -54,7 +54,7 @@ func (r *resolverDiscovery) Name() string {
 }
 
 // Initialize will init the resolver on startup
-func (r *resolverDiscovery) Initialize(c *resolver2.ConfigEntry) error {
+func (r *resolverDiscovery) Initialize(c *resolver.ConfigEntry) error {
 	var err error
 	defer func() {
 		if nil != err {
@@ -69,7 +69,7 @@ func (r *resolverDiscovery) Initialize(c *resolver2.ConfigEntry) error {
 	if nil != err {
 		return err
 	}
-	r.suffix = resolver2.AddQuota(c.Suffix)
+	r.suffix = resolver.AddQuota(c.Suffix)
 	r.dnsTtl = c.DnsTtl
 	r.namespace = c.Namespace
 	return nil
@@ -159,7 +159,7 @@ func (r *resolverDiscovery) ServeDNS(ctx context.Context, question dns.Question,
 }
 
 func (r *resolverDiscovery) lookupFromPolaris(qname string, currentNs string) ([]model.Instance, error) {
-	svcKey := resolver2.ParseQname(qname, r.suffix, currentNs)
+	svcKey := resolver.ParseQname(qname, r.suffix, currentNs)
 	if nil == svcKey {
 		return nil, nil
 	}

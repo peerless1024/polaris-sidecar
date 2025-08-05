@@ -353,10 +353,6 @@ func (s *SidecarConfig) isMeshMetricsEnabled() bool {
 	return s.MeshEnabled && s.MeshConfig != nil && s.MeshConfig.Metrics != nil && s.MeshConfig.Metrics.Enable
 }
 
-func (s *SidecarConfig) isMeshRateLimitEnabled() bool {
-	return s.MeshEnabled && s.MeshConfig != nil && s.MeshConfig.RateLimit != nil && s.MeshConfig.RateLimit.Enable
-}
-
 func (s *SidecarConfig) isMeshMTLSEnabled() bool {
 	return s.MeshEnabled && s.MeshConfig != nil && s.MeshConfig.MTLS != nil && s.MeshConfig.MTLS.Enable
 }
