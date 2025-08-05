@@ -23,6 +23,7 @@ import (
 	"github.com/miekg/dns"
 
 	debughttp "github.com/polarismesh/polaris-sidecar/internal/debugger"
+	"github.com/polarismesh/polaris-sidecar/pkg/recursor"
 )
 
 const (
@@ -36,15 +37,8 @@ type ResolverConfig struct {
 	BindLocalhost bool
 	BindIP        string
 	BindPort      uint32
-	Recurse       *RecurseConfig
+	Recurse       *recursor.RecurseConfig
 	Resolvers     []*ConfigEntry
-}
-
-// RecurseConfig recursor name resolve config
-type RecurseConfig struct {
-	Enable      bool     `yaml:"enable"`
-	TimeoutSec  int      `yaml:"timeoutSec"`
-	NameServers []string `yaml:"name_servers"` // TODO: 去掉，放这里不合理
 }
 
 // ConfigEntry: resolver plugin config entry

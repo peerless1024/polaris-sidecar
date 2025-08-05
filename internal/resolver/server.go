@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,47 +30,9 @@ import (
 
 	debughttp "github.com/polarismesh/polaris-sidecar/internal/debugger"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
+	"github.com/polarismesh/polaris-sidecar/pkg/recursor"
+	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
-
-const (
-	etcResolvConfPath = "/etc/resolv.conf"
-)
-
-func IsFile(path string) bool {
-	s, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return !s.IsDir()
-}
-
-// TODO 这里需要继续补全
-func parseResolvConf(bindLocalhost bool) ([]string, []string) {
-	if !IsFile(etcResolvConfPath) {
-		log.Infof("[resolver] /etc/resolv.conf is not exist, skip to parse it")
-		return nil, nil
-	}
-	dnsConfig, err := dns.ClientConfigFromFile(etcResolvConfPath)
-	if err != nil {
-		log.Errorf("[resolver] failed to load /etc/resolv.conf: %v", err)
-		return nil, nil
-	}
-	var searchNames []string
-	var nameservers []string
-	if dnsConfig != nil {
-		for _, search := range dnsConfig.Search {
-			searchNames = append(searchNames, search+".")
-		}
-
-		for _, server := range dnsConfig.Servers {
-			if server == "127.0.0.1" && bindLocalhost {
-				continue
-			}
-			nameservers = append(nameservers, server)
-		}
-	}
-	return nameservers, searchNames
-}
 
 // TODO 解析配置文件增加其他参数
 func NewServers(conf *ResolverConfig) (*Server, error) {
@@ -98,35 +59,26 @@ func NewServers(conf *ResolverConfig) (*Server, error) {
 		namingResolvers = append(namingResolvers, handler)
 	}
 
-	nameservers, searchNames := parseResolvConf(conf.BindLocalhost)
-	log.Infof("[resolver] finished to parse /etc/resolv.conf, nameservers %s, search %s", nameservers, searchNames)
-	// TODO Recurse为空的情形
-	if len(conf.Recurse.NameServers) == 0 {
-		conf.Recurse.NameServers = nameservers
-	}
-	recurseAddresses := make([]string, 0, len(conf.Recurse.NameServers))
-	for _, nameserver := range conf.Recurse.NameServers {
-		recurseAddresses = append(recurseAddresses, fmt.Sprintf("%s:53", nameserver))
+	resolvConfig, err := recursor.ParseResolvConf(conf.BindLocalhost, conf.Recurse.NameServers)
+	if nil != err {
+		log.Errorf("[resolver] ParseResolvConf err: %v", err)
+		return nil, err
 	}
 	udpServer := &dns.Server{
-		Addr: conf.BindIP + ":" + strconv.FormatUint(uint64(conf.BindPort), 10), Net: "udp",
+		Addr: conf.BindIP + utils.ColonSep + strconv.FormatUint(uint64(conf.BindPort), 10), Net: "udp",
 		Handler: buildDNSServer(
-			"udp",
+			recursor.UdpProtocol,
 			namingResolvers,
-			searchNames,
-			time.Duration(conf.Recurse.TimeoutSec)*time.Second,
-			recurseAddresses,
+			resolvConfig,
 			conf.Recurse.Enable,
 		),
 	}
 	tcpServer := &dns.Server{
-		Addr: conf.BindIP + ":" + strconv.FormatUint(uint64(conf.BindPort), 10), Net: "tcp",
+		Addr: conf.BindIP + utils.ColonSep + strconv.FormatUint(uint64(conf.BindPort), 10), Net: "tcp",
 		Handler: buildDNSServer(
-			"tcp",
+			recursor.TcpProtocol,
 			namingResolvers,
-			searchNames,
-			time.Duration(conf.Recurse.TimeoutSec)*time.Second,
-			recurseAddresses,
+			resolvConfig,
 			conf.Recurse.Enable,
 		),
 	}
@@ -258,39 +210,31 @@ func (svr *Server) Debugger() []debughttp.DebugHandler {
 	return ret
 }
 
-func buildDNSServer(protocol string,
-	resolvers []NamingResolver,
-	searchNames []string,
-	recursorTimeout time.Duration,
-	recursors []string,
+func buildDNSServer(protocol string, resolvers []NamingResolver, resolveConfig *dns.ClientConfig,
 	recurseEnable bool) *dnsServer {
 	return &dnsServer{
-		protocol:        protocol,
-		resolvers:       resolvers,
-		searchNames:     searchNames,
-		recursorTimeout: recursorTimeout,
-		recursors:       recursors,
-		recurseEnable:   recurseEnable,
+		protocol:      protocol,
+		resolvers:     resolvers,
+		recurseEnable: recurseEnable,
+		resolveConfig: resolveConfig,
 	}
 }
 
 type dnsServer struct {
-	protocol        string
-	resolvers       []NamingResolver
-	searchNames     []string
-	recursorTimeout time.Duration
-	recursors       []string
-	recurseEnable   bool
+	protocol      string
+	resolvers     []NamingResolver
+	resolveConfig *dns.ClientConfig
+	recurseEnable bool
 }
 
 // Preprocess 在容器环境中会用到
 func (d *dnsServer) Preprocess(qname string) string {
 	log.Debugf("[resolver] input question name %s", qname)
-	if len(d.searchNames) == 0 {
+	if len(d.resolveConfig.Search) == 0 {
 		return qname
 	}
 
-	for _, searchName := range d.searchNames {
+	for _, searchName := range d.resolveConfig.Search {
 		if strings.HasSuffix(qname, searchName) {
 			processed := qname[:len(qname)-len(searchName)]
 			if processed == "" {
@@ -341,7 +285,7 @@ func (d *dnsServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	question := req.Question[0]
 	qname := d.Preprocess(question.Name)
 	log.Debugf("[resolver] input question name %s, after Preprocess name %s", question.Name, qname)
-	ctx := context.WithValue(context.Background(), ContextProtocol, d.protocol)
+	ctx := context.WithValue(context.Background(), utils.ContextProtocol, d.protocol)
 	var resp *dns.Msg
 	for _, handler := range d.resolvers {
 		resp = handler.ServeDNS(ctx, question, qname)
@@ -350,6 +294,11 @@ func (d *dnsServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			d.sendDnsResponse(w, req, resp)
 			return
 		}
+	}
+	if !d.recurseEnable {
+		log.Errorf("[resolver] empty result from polaris, recurse is not enabled, request %v, response for %s is nil",
+			req, question.Name)
+		d.sendDnsCode(w, req, dns.RcodeServerFailure)
 	}
 	// 降级到本地 nameserver
 	d.handleRecurse(w, req)
@@ -369,41 +318,40 @@ func (d *dnsServer) handleRecurse(resp dns.ResponseWriter, req *dns.Msg) {
 	if _, ok := resp.RemoteAddr().(*net.TCPAddr); ok {
 		network = "tcp"
 	}
-	if d.recurseEnable {
-		// Recursively resolve
-		c := &dns.Client{Net: network, Timeout: d.recursorTimeout}
-		var r *dns.Msg
-		var rtt time.Duration
-		var err error
-		// TODO: 增加对 ndots 和 options 配置的处理
-		for _, recursor := range d.recursors {
-			r, rtt, err = c.Exchange(req, recursor)
-			// 只要是 0（NOERROR） 或 3（NXDOMAIN），resolver 不会轮询
-			if r != nil && (r.Rcode != dns.RcodeSuccess && r.Rcode != dns.RcodeNameError) {
-				log.Warnf("[resolver] recurse failed for question, question: %s, rtt: %s, recursor: %s, rcode: %s",
-					q.String(), rtt, recursor, dns.RcodeToString[r.Rcode])
-				// If we still have recursors to forward the query to,
-				// we move forward onto the next one else the loop ends
-				continue
-			} else if err == nil || (r != nil && r.Truncated) {
-				// 当r.Truncated为true时，即使响应被截断，也视为成功响应。服务器会转发这个被截断的响应给客户端
-				// 客户端负责使用TCP重新查询以获取完整响应
-				// Forward the response
-				log.Infof("[resolver] recurse succeeded for question, question: %s, rtt: %s, recursor: %s",
-					q.String(), rtt, recursor)
-				if err := resp.WriteMsg(r); err != nil {
-					log.Warnf("failed to respond, error: %v", err)
-				}
-				return
-			}
-			log.Errorf("[resolver] recurse failed, error: %v", err)
-		}
 
-		// If all resolvers fail, return a SERVFAIL message
-		log.Errorf(
-			"[resolver] all resolvers failed for question from polaris, question: %s, polaris: %s, client_network: %s",
-			q.String(), resp.RemoteAddr().String(), resp.RemoteAddr().Network())
+	// Recursively resolve
+	c := &dns.Client{Net: network, Timeout: time.Duration(d.resolveConfig.Timeout) * time.Second}
+	var r *dns.Msg
+	var rtt time.Duration
+	var err error
+	// TODO: 增加对 ndots 和 options 配置的处理
+	for _, recursor := range d.resolveConfig.Servers {
+		r, rtt, err = c.Exchange(req, recursor)
+		// 只要是 0（NOERROR） 或 3（NXDOMAIN），resolver 不会轮询
+		if r != nil && (r.Rcode != dns.RcodeSuccess && r.Rcode != dns.RcodeNameError) {
+			log.Warnf("[resolver] recurse failed for question, question: %s, rtt: %s, recursor: %s, rcode: %s",
+				q.String(), rtt, recursor, dns.RcodeToString[r.Rcode])
+			// If we still have recursors to forward the query to,
+			// we move forward onto the next one else the loop ends
+			continue
+		} else if err == nil || (r != nil && r.Truncated) {
+			// 当r.Truncated为true时，即使响应被截断，也视为成功响应。服务器会转发这个被截断的响应给客户端
+			// 客户端负责使用TCP重新查询以获取完整响应
+			// Forward the response
+			log.Infof("[resolver] recurse succeeded for question, question: %s, rtt: %s, recursor: %s",
+				q.String(), rtt, recursor)
+			if err := resp.WriteMsg(r); err != nil {
+				log.Warnf("failed to respond, error: %v", err)
+			}
+			return
+		}
+		log.Errorf("[resolver] recurse failed, error: %v", err)
 	}
+
+	// If all resolvers fail, return a SERVFAIL message
+	log.Errorf(
+		"[resolver] all resolvers failed for question from polaris, question: %s, polaris: %s, client_network: %s",
+		q.String(), resp.RemoteAddr().String(), resp.RemoteAddr().Network())
 	d.sendDnsCode(resp, req, dns.RcodeServerFailure)
 }
 

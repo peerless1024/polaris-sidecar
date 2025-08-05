@@ -28,6 +28,7 @@ import (
 	"github.com/polarismesh/polaris-sidecar/internal/resolver"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 	polarisApi "github.com/polarismesh/polaris-sidecar/pkg/polaris"
+	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
 const name = resolver.PluginNameMeshProxy
@@ -75,8 +76,10 @@ func (r *resolverMesh) Initialize(c *resolver.ConfigEntry) error {
 
 // Destroy will destroy the resolver on shutdown
 func (r *resolverMesh) Destroy() {
-	// TODO add destroy
-	log.Infof("[mesh] destroy mesh resolver")
+	if nil != r.consumer {
+		r.consumer.Destroy()
+		log.Infof("[mesh] %s resolver polaris consumerAPI destroyed", name)
+	}
 }
 
 // ServeDNS is like dns.Handler except ServeDNS may return an rcode
@@ -91,7 +94,7 @@ func (r *resolverMesh) Destroy() {
 //
 // * NOTIMP (dns.RcodeNotImplemented)
 func (r *resolverMesh) ServeDNS(ctx context.Context, question dns.Question, qname string) *dns.Msg {
-	_, matched := resolver.MatchSuffix(qname, r.suffix)
+	_, matched := utils.MatchSuffix(qname, r.suffix)
 	if !matched {
 		log.Infof("[mesh] suffix not matched for name %s, suffix %s", qname, r.suffix)
 		return nil
@@ -101,7 +104,7 @@ func (r *resolverMesh) ServeDNS(ctx context.Context, question dns.Question, qnam
 		return ret
 	}
 	// 可能这个时候 qname 只有服务名称，这里手动补充 Namespace 信息
-	qname = resolver.RemoveQuota(qname)
+	qname = utils.RemoveQuota(qname)
 	qname = qname + "." + r.config.Namespace + "."
 	ret = r.localDNSServer.ServeDNS(ctx, &question, qname)
 	if ret == nil {

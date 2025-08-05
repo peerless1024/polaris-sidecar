@@ -32,6 +32,7 @@ import (
 	"github.com/polarismesh/polaris-sidecar/internal/resolver"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 	polarisApi "github.com/polarismesh/polaris-sidecar/pkg/polaris"
+	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
 func init() {
@@ -58,7 +59,7 @@ func (r *resolverDiscovery) Initialize(c *resolver.ConfigEntry) error {
 	var err error
 	defer func() {
 		if nil != err {
-			log.Errorf("[resolver] fail to init resolver %s, err: %v", name, err)
+			log.Errorf("[dnsagent] fail to init resolver %s, err: %v", name, err)
 		}
 	}()
 	r.config, err = parseOptions(c.Option)
@@ -69,7 +70,7 @@ func (r *resolverDiscovery) Initialize(c *resolver.ConfigEntry) error {
 	if nil != err {
 		return err
 	}
-	r.suffix = resolver.AddQuota(c.Suffix)
+	r.suffix = utils.AddQuota(c.Suffix)
 	r.dnsTtl = c.DnsTtl
 	r.namespace = c.Namespace
 	return nil
@@ -88,7 +89,7 @@ func (r *resolverDiscovery) Debugger() []debughttp.DebugHandler {
 func (r *resolverDiscovery) Destroy() {
 	if nil != r.consumer {
 		r.consumer.Destroy()
-		log.Infof("[resolver] %s resolver polaris consumerAPI destroyed", name)
+		log.Infof("[dnsagent] %s resolver polaris consumerAPI destroyed", name)
 	}
 }
 
@@ -128,7 +129,7 @@ func (r *resolverDiscovery) ServeDNS(ctx context.Context, question dns.Question,
 		if labels[i] == "_addr" {
 			ret, err := hex.DecodeString(labels[i-1])
 			if err != nil {
-				log.Error("decode ip str fail", zap.String("domain", qname), zap.Error(err))
+				log.Error("[dnsagent] decode ip str fail", zap.String("domain", qname), zap.Error(err))
 				return nil
 			}
 			rr := r.markRecord(question, net.IP(ret), nil)
@@ -159,7 +160,7 @@ func (r *resolverDiscovery) ServeDNS(ctx context.Context, question dns.Question,
 }
 
 func (r *resolverDiscovery) lookupFromPolaris(qname string, currentNs string) ([]model.Instance, error) {
-	svcKey := resolver.ParseQname(qname, r.suffix, currentNs)
+	svcKey := utils.ParseQname(qname, r.suffix, currentNs)
 	if nil == svcKey {
 		return nil, nil
 	}
@@ -171,7 +172,7 @@ func (r *resolverDiscovery) lookupFromPolaris(qname string, currentNs string) ([
 	}
 	resp, err := r.consumer.GetOneInstance(request)
 	if nil != err {
-		log.Errorf("[discovery] fail to lookup service %s, err: %v", *svcKey, err)
+		log.Errorf("[dnsagent] fail to lookup service %s, err: %v", *svcKey, err)
 		return nil, err
 	}
 

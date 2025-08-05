@@ -35,6 +35,8 @@ import (
 	"github.com/polarismesh/polaris-sidecar/internal/resolver"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 	"github.com/polarismesh/polaris-sidecar/pkg/polaris"
+	"github.com/polarismesh/polaris-sidecar/pkg/recursor"
+	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
 // SidecarConfig global sidecar config struct
@@ -44,7 +46,7 @@ type SidecarConfig struct {
 	Bind          string                  `yaml:"bind"`
 	Port          int                     `yaml:"port"`
 	Logger        *log.Options            `yaml:"logger"`
-	Recurse       *resolver.RecurseConfig `yaml:"recurse"`
+	Recurse       *recursor.RecurseConfig `yaml:"recurse"`
 	Resolvers     []*resolver.ConfigEntry `yaml:"resolvers"`
 	MeshConfig    *MeshConfig             `yaml:"mesh"`
 	Debugger      *debugger.DebugConfig   `yaml:"debugger"`
@@ -183,7 +185,7 @@ func (s *SidecarConfig) mergeFileConfig(configFile string) error {
 		log.Errorf("[config] config file is empty, use default sidecar config")
 		return nil
 	}
-	if !IsFile(configFile) {
+	if !utils.IsFile(configFile) {
 		log.Errorf("[config] config file %s not exists, use default sidecar config", configFile)
 		return nil
 	}
@@ -280,7 +282,7 @@ func (s *SidecarConfig) mergeBootConfig(config *BootConfig) error {
 					}
 				}
 				if len(config.ResolverDnsAgentRouteLabels) > 0 {
-					labels := parseLabels(config.ResolverDnsAgentRouteLabels)
+					labels := utils.ParseLabels(config.ResolverDnsAgentRouteLabels)
 					if len(labels) > 0 {
 						if len(resolverConfig.Option) == 0 {
 							resolverConfig.Option = make(map[string]interface{})

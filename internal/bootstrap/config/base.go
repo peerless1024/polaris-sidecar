@@ -34,6 +34,8 @@ import (
 	"github.com/polarismesh/polaris-sidecar/internal/resolver"
 	"github.com/polarismesh/polaris-sidecar/internal/resolver/meshproxy"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
+	"github.com/polarismesh/polaris-sidecar/pkg/recursor"
+	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
 // BootConfig simple config for bootstrap
@@ -83,7 +85,7 @@ func defaultSidecarConfig() *SidecarConfig {
 		Namespace: "default",
 		Bind:      "0.0.0.0",
 		Port:      53,
-		Recurse: &resolver.RecurseConfig{
+		Recurse: &recursor.RecurseConfig{
 			Enable:     false,
 			TimeoutSec: 1,
 		},
@@ -153,33 +155,6 @@ func parseYamlContent(content []byte, sidecarConfig *SidecarConfig) error {
 	return nil
 }
 
-func IsFile(path string) bool {
-	s, err := os.Stat(path)
-	if err != nil {
-		log.Errorf("[config] fail to stat file %s, err: %v", path, err)
-		return false
-	}
-	return !s.IsDir()
-}
-
-func parseLabels(labels string) map[string]string {
-	if len(labels) == 0 {
-		return nil
-	}
-	values := make(map[string]string)
-	tokens := strings.Split(labels, labelSep)
-	for _, token := range tokens {
-		if len(token) == 0 {
-			continue
-		}
-		pairs := strings.Split(token, kvSep)
-		if len(pairs) > 1 {
-			values[pairs[0]] = pairs[1]
-		}
-	}
-	return values
-}
-
 func getEnvStringValue(envName string, defaultValue string) string {
 	envValue := os.Getenv(envName)
 	if len(envValue) > 0 {
@@ -191,7 +166,7 @@ func getEnvStringValue(envName string, defaultValue string) string {
 func getEnvStringsValue(envName string, defaultValues []string) []string {
 	envValue := os.Getenv(envName)
 	if len(envValue) > 0 {
-		return strings.Split(envValue, ",")
+		return strings.Split(envValue, utils.CommaSep)
 	}
 	return defaultValues
 }

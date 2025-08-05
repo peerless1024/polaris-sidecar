@@ -15,7 +15,7 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package resolver
+package utils
 
 import (
 	"strings"
@@ -25,8 +25,8 @@ import (
 )
 
 const (
+	SysNamespace = "polaris"
 	Quota        = "."
-	sysNamespace = "polaris"
 )
 
 type contextKey string
@@ -53,7 +53,7 @@ func ParseQname(qname string, suffix string, currentNs string) *model.ServiceKey
 		serviceName = qname
 	} else {
 		namespace = qname[sepIndex+1:]
-		if strings.ToLower(namespace) == sysNamespace {
+		if strings.ToLower(namespace) == SysNamespace {
 			namespace = config.ServerNamespace
 		}
 		serviceName = qname[:sepIndex]

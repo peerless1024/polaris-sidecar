@@ -19,31 +19,14 @@ package dnsagent
 
 import (
 	"encoding/json"
-	"strings"
 
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
+	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
 type resolverConfig struct {
 	RouteLabelsMap map[string]string `json:"-"`
 	RouteLabels    string            `json:"route_labels"`
-}
-
-func parseLabels(value string) map[string]string {
-	values := make(map[string]string)
-	if len(value) == 0 {
-		return values
-	}
-	tokens := strings.Split(value, ",")
-	for _, token := range tokens {
-		idx := strings.Index(token, ":")
-		if idx < 0 {
-			values[token] = token
-		} else {
-			values[token[0:idx]] = token[idx+1:]
-		}
-	}
-	return values
 }
 
 func parseOptions(options map[string]interface{}) (*resolverConfig, error) {
@@ -60,6 +43,6 @@ func parseOptions(options map[string]interface{}) (*resolverConfig, error) {
 		log.Errorf("[dnsagent] fail to unmarshal json to config, err is %v", err)
 		return nil, err
 	}
-	config.RouteLabelsMap = parseLabels(config.RouteLabels)
+	config.RouteLabelsMap = utils.ParseLabels(config.RouteLabels)
 	return config, nil
 }

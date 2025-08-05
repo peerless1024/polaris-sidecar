@@ -29,7 +29,5 @@ const (
 )
 
 const (
-	labelSep         = ","
-	kvSep            = ":"
 	defaultSvcSuffix = "."
 )
