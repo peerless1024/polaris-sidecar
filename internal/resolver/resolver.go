@@ -22,8 +22,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	debughttp "github.com/polarismesh/polaris-sidecar/internal/debugger"
-	"github.com/polarismesh/polaris-sidecar/pkg/recursor"
+	"github.com/polarismesh/polaris-sidecar/internal/debugger"
 )
 
 const (
@@ -34,10 +33,8 @@ const (
 )
 
 type ResolverConfig struct {
-	BindLocalhost bool
 	BindIP        string
 	BindPort      uint32
-	Recurse       *recursor.RecurseConfig
 	Resolvers     []*ConfigEntry
 }
 
@@ -64,7 +61,7 @@ type NamingResolver interface {
 	// ServeDNS is like dns.Handler except ServeDNS may return an response or nil
 	ServeDNS(context.Context, dns.Question, string) *dns.Msg
 	// Debugger
-	Debugger() []debughttp.DebugHandler
+	Debugger() []debugger.DebugHandler
 }
 
 var resolvers = map[string]NamingResolver{}

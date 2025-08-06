@@ -33,9 +33,8 @@ import (
 	"github.com/polarismesh/polaris-sidecar/internal/mesh/rls"
 	"github.com/polarismesh/polaris-sidecar/internal/resolver"
 	"github.com/polarismesh/polaris-sidecar/internal/resolver/meshproxy"
+	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
-	"github.com/polarismesh/polaris-sidecar/pkg/recursor"
-	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
 // BootConfig simple config for bootstrap
@@ -85,7 +84,7 @@ func defaultSidecarConfig() *SidecarConfig {
 		Namespace: "default",
 		Bind:      "0.0.0.0",
 		Port:      53,
-		Recurse: &recursor.RecurseConfig{
+		Recurse: &RecurseConfig{
 			Enable:     false,
 			TimeoutSec: 1,
 		},
@@ -166,7 +165,7 @@ func getEnvStringValue(envName string, defaultValue string) string {
 func getEnvStringsValue(envName string, defaultValues []string) []string {
 	envValue := os.Getenv(envName)
 	if len(envValue) > 0 {
-		return strings.Split(envValue, utils.CommaSep)
+		return strings.Split(envValue, constants.CommaSymbol)
 	}
 	return defaultValues
 }

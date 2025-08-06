@@ -20,7 +20,6 @@ package config
 import (
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 
@@ -33,9 +32,10 @@ import (
 	"github.com/polarismesh/polaris-sidecar/internal/mesh/mtls"
 	"github.com/polarismesh/polaris-sidecar/internal/mesh/rls"
 	"github.com/polarismesh/polaris-sidecar/internal/resolver"
+	"github.com/polarismesh/polaris-sidecar/internal/resolver/recursor"
+	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 	"github.com/polarismesh/polaris-sidecar/pkg/polaris"
-	"github.com/polarismesh/polaris-sidecar/pkg/recursor"
 	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
@@ -46,17 +46,23 @@ type SidecarConfig struct {
 	Bind          string                  `yaml:"bind"`
 	Port          int                     `yaml:"port"`
 	Logger        *log.Options            `yaml:"logger"`
-	Recurse       *recursor.RecurseConfig `yaml:"recurse"`
+	Recurse       *RecurseConfig          `yaml:"recurse"`
 	Resolvers     []*resolver.ConfigEntry `yaml:"resolvers"`
 	MeshConfig    *MeshConfig             `yaml:"mesh"`
 	Debugger      *debugger.DebugConfig   `yaml:"debugger"`
-	DnsEnabled    bool
-	MeshEnabled   bool
+	DnsEnabled    bool                    `yaml:"-"`
+	MeshEnabled   bool                    `yaml:"-"`
 }
 
 type PolarisConfig struct {
 	Addresses []string                    `yaml:"addresses"`
 	Location  *sdkconf.LocationConfigImpl `yaml:"location"`
+}
+
+type RecurseConfig struct {
+	Enable      bool     `yaml:"enable"`
+	TimeoutSec  int      `yaml:"timeoutSec"`
+	NameServers []string `yaml:"name_servers"`
 }
 
 type MeshConfig struct {
@@ -104,13 +110,22 @@ func (s *SidecarConfig) InitPolarisApi() error {
 
 // InitDnsServers initializes the DNS servers based on the configuration.
 func (s *SidecarConfig) InitDnsServers() (*resolver.Server, error) {
-	svr, err := resolver.NewServers(&resolver.ResolverConfig{
-		BindLocalhost: s.bindLocalhost(),
-		BindIP:        s.Bind,
-		BindPort:      uint32(s.Port),
-		Recurse:       s.Recurse,
-		Resolvers:     s.Resolvers,
-	})
+	resolveConfig := &resolver.ResolverConfig{
+		BindIP:    s.Bind,
+		BindPort:  uint32(s.Port),
+		Resolvers: s.Resolvers,
+	}
+	var err error
+	var recurseProxyConf *recursor.Config
+	if s.Recurse.Enable {
+		recurseProxyConf, err = recursor.InitRecurseProxy(s.bindLocalhost(), s.Recurse.TimeoutSec,
+			s.Recurse.NameServers)
+		if err != nil {
+			log.Errorf("[bootstrap] fail to init recursor proxy config, err: %v", err)
+			return nil, err
+		}
+	}
+	svr, err := resolver.NewServer(resolveConfig, recurseProxyConf)
 	if err != nil {
 		log.Errorf("[bootstrap] fail to init dns server, err: %v", err)
 		return nil, err
@@ -172,7 +187,7 @@ func (s *SidecarConfig) InitMeshRatelimit() *rls.RateLimitServer {
 		Network: strings.ToLower(s.MeshConfig.RateLimit.Network),
 		TLSInfo: s.MeshConfig.RateLimit.TLSInfo,
 	}
-	if conf.Network == "tcp" {
+	if conf.Network == constants.TcpProtocol {
 		conf.Address = fmt.Sprintf("%s:%d", s.Bind, s.MeshConfig.RateLimit.BindPort)
 	}
 	ratelimitServer := rls.New(s.Namespace, conf)
@@ -181,20 +196,10 @@ func (s *SidecarConfig) InitMeshRatelimit() *rls.RateLimitServer {
 }
 
 func (s *SidecarConfig) mergeFileConfig(configFile string) error {
-	if len(configFile) == 0 {
-		log.Errorf("[config] config file is empty, use default sidecar config")
-		return nil
+	buf, err := utils.ReadFile(configFile)
+	if nil != err || buf == nil {
+		return err
 	}
-	if !utils.IsFile(configFile) {
-		log.Errorf("[config] config file %s not exists, use default sidecar config", configFile)
-		return nil
-	}
-	buf, err := os.ReadFile(configFile)
-	if nil != err {
-		log.Errorf("[config] read file %s error: %v", configFile, err)
-		return fmt.Errorf("read file %s error", configFile)
-	}
-	log.Infof("[config] read config file succeed, content:\n%s", string(buf))
 	err = parseYamlContent(buf, s)
 	if nil != err {
 		return err

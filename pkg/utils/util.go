@@ -22,17 +22,8 @@ import (
 
 	"github.com/polarismesh/polaris-go/pkg/config"
 	"github.com/polarismesh/polaris-go/pkg/model"
-)
 
-const (
-	SysNamespace = "polaris"
-	Quota        = "."
-)
-
-type contextKey string
-
-const (
-	ContextProtocol contextKey = "protocol"
+	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 )
 
 // ParseQname parse the qname into service and suffix
@@ -47,13 +38,13 @@ func ParseQname(qname string, suffix string, currentNs string) *model.ServiceKey
 	var namespace string
 	var serviceName string
 	// quota not found, use current namespace
-	sepIndex := strings.LastIndex(qname, Quota)
+	sepIndex := strings.LastIndex(qname, constants.DotSymbol)
 	if sepIndex < 0 {
 		namespace = currentNs
 		serviceName = qname
 	} else {
 		namespace = qname[sepIndex+1:]
-		if strings.ToLower(namespace) == SysNamespace {
+		if strings.ToLower(namespace) == constants.SysNamespace {
 			namespace = config.ServerNamespace
 		}
 		serviceName = qname[:sepIndex]
@@ -77,15 +68,15 @@ func MatchSuffix(qname string, suffix string) (string, bool) {
 
 // AddQuota add quota to the qname if not exist
 func AddQuota(qname string) string {
-	if !strings.HasSuffix(qname, Quota) {
-		qname += Quota
+	if !strings.HasSuffix(qname, constants.DotSymbol) {
+		qname += constants.DotSymbol
 	}
 	return qname
 }
 
 // RemoveQuota remove quota from the qname if exist
 func RemoveQuota(qname string) string {
-	if strings.HasSuffix(qname, Quota) {
+	if strings.HasSuffix(qname, constants.DotSymbol) {
 		qname = qname[:len(qname)-1]
 	}
 	return qname

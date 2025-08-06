@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 )
 
@@ -37,7 +38,7 @@ func (s *DebugServer) Run(ctx context.Context, errChan chan error) {
 	defer func() {
 		s.Destroy()
 	}()
-	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.bind, s.port))
+	ln, err := net.Listen(constants.TcpProtocol, fmt.Sprintf("%s:%d", s.bind, s.port))
 	if err != nil {
 		log.Errorf(": %v", err)
 		errChan <- err

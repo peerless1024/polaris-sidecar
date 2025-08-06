@@ -20,33 +20,29 @@ package resolver
 import (
 	"context"
 	"fmt"
-	"net"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/miekg/dns"
 
 	debughttp "github.com/polarismesh/polaris-sidecar/internal/debugger"
+	"github.com/polarismesh/polaris-sidecar/internal/resolver/recursor"
+	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
-	"github.com/polarismesh/polaris-sidecar/pkg/recursor"
-	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
-// TODO 解析配置文件增加其他参数
-func NewServers(conf *ResolverConfig) (*Server, error) {
+func NewServer(conf *ResolverConfig, recurseProxyConf *recursor.Config) (*Server, error) {
 	namingResolvers := make([]NamingResolver, 0, len(conf.Resolvers))
 	for _, resolverCfg := range conf.Resolvers {
 		if !resolverCfg.Enable {
 			log.Infof("[resolver] resolver %s is not enabled", resolverCfg.Name)
 			continue
 		}
-		name := resolverCfg.Name
-		handler := NameResolver(name)
+		handler := NameResolver(resolverCfg.Name)
 		if nil == handler {
 			log.Errorf("[resolver] resolver %s is not found", resolverCfg.Name)
-			return nil, fmt.Errorf("fail to lookup resolver %s, consider it's not registered", name)
+			return nil, fmt.Errorf("fail to lookup resolver %s, consider it's not registered", resolverCfg.Name)
 		}
 		if err := handler.Initialize(resolverCfg); nil != err {
 			for _, initHandler := range namingResolvers {
@@ -58,31 +54,25 @@ func NewServers(conf *ResolverConfig) (*Server, error) {
 		log.Infof("[resolver] finished to init resolver %s", resolverCfg.Name)
 		namingResolvers = append(namingResolvers, handler)
 	}
-
-	resolvConfig, err := recursor.ParseResolvConf(conf.BindLocalhost, conf.Recurse.NameServers)
-	if nil != err {
-		log.Errorf("[resolver] ParseResolvConf err: %v", err)
-		return nil, err
-	}
+	recurseProxy := recursor.BuildProxy(recurseProxyConf)
 	udpServer := &dns.Server{
-		Addr: conf.BindIP + utils.ColonSep + strconv.FormatUint(uint64(conf.BindPort), 10), Net: "udp",
-		Handler: buildDNSServer(
-			recursor.UdpProtocol,
+		Addr: conf.BindIP + constants.ColonSymbol + strconv.FormatUint(uint64(conf.BindPort), 10),
+		Net:  constants.UdpProtocol,
+		Handler: buildDnsHandler(
+			constants.UdpProtocol,
 			namingResolvers,
-			resolvConfig,
-			conf.Recurse.Enable,
+			recurseProxy,
 		),
 	}
 	tcpServer := &dns.Server{
-		Addr: conf.BindIP + utils.ColonSep + strconv.FormatUint(uint64(conf.BindPort), 10), Net: "tcp",
-		Handler: buildDNSServer(
-			recursor.TcpProtocol,
+		Addr: conf.BindIP + constants.ColonSymbol + strconv.FormatUint(uint64(conf.BindPort), 10),
+		Net:  constants.TcpProtocol,
+		Handler: buildDnsHandler(
+			constants.TcpProtocol,
 			namingResolvers,
-			resolvConfig,
-			conf.Recurse.Enable,
+			recurseProxy,
 		),
 	}
-
 	return &Server{
 		dnsSeverList: []*dns.Server{udpServer, tcpServer},
 		resolvers:    namingResolvers,
@@ -208,227 +198,4 @@ func (svr *Server) Debugger() []debughttp.DebugHandler {
 		ret = append(ret, svr.resolvers[i].Debugger()...)
 	}
 	return ret
-}
-
-func buildDNSServer(protocol string, resolvers []NamingResolver, resolveConfig *dns.ClientConfig,
-	recurseEnable bool) *dnsServer {
-	return &dnsServer{
-		protocol:      protocol,
-		resolvers:     resolvers,
-		recurseEnable: recurseEnable,
-		resolveConfig: resolveConfig,
-	}
-}
-
-type dnsServer struct {
-	protocol      string
-	resolvers     []NamingResolver
-	resolveConfig *dns.ClientConfig
-	recurseEnable bool
-}
-
-// Preprocess 在容器环境中会用到
-func (d *dnsServer) Preprocess(qname string) string {
-	log.Debugf("[resolver] input question name %s", qname)
-	if len(d.resolveConfig.Search) == 0 {
-		return qname
-	}
-
-	for _, searchName := range d.resolveConfig.Search {
-		if strings.HasSuffix(qname, searchName) {
-			processed := qname[:len(qname)-len(searchName)]
-			if processed == "" {
-				return qname // 避免返回空字符串
-			}
-			return processed
-		}
-	}
-
-	return qname
-}
-
-func (d *dnsServer) sendDnsCode(w dns.ResponseWriter, r *dns.Msg, code int) {
-	msg := &dns.Msg{}
-	msg.SetReply(r)
-	msg.RecursionDesired = true
-	msg.RecursionAvailable = true
-	msg.Rcode = code
-	msg.Truncate(size(d.protocol, r))
-	if edns := r.IsEdns0(); edns != nil {
-		setEDNS(r, msg, true)
-	}
-	err := w.WriteMsg(msg)
-	if nil != err {
-		log.Errorf("[resolver] fail to write dns response message, err: %v", err)
-	}
-}
-
-func (d *dnsServer) sendDnsResponse(w dns.ResponseWriter, r *dns.Msg, msg *dns.Msg) {
-	msg.SetReply(r)
-	msg.Truncate(size(d.protocol, r))
-	if edns := r.IsEdns0(); edns != nil {
-		setEDNS(r, msg, true)
-	}
-	err := w.WriteMsg(msg)
-	if nil != err {
-		log.Errorf("[resolver] fail to write dns response message, err: %v", err)
-	}
-}
-
-// ServeDNS handler callback
-func (d *dnsServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
-	// questions length is 0, send refused
-	if len(req.Question) == 0 {
-		d.sendDnsCode(w, req, dns.RcodeRefused)
-	}
-	// questions type we only accept
-	question := req.Question[0]
-	qname := d.Preprocess(question.Name)
-	log.Debugf("[resolver] input question name %s, after Preprocess name %s", question.Name, qname)
-	ctx := context.WithValue(context.Background(), utils.ContextProtocol, d.protocol)
-	var resp *dns.Msg
-	for _, handler := range d.resolvers {
-		resp = handler.ServeDNS(ctx, question, qname)
-		if nil != resp {
-			log.Infof("[resolver] request %v, response for %s is %v", req, question.Name, resp)
-			d.sendDnsResponse(w, req, resp)
-			return
-		}
-	}
-	if !d.recurseEnable {
-		log.Errorf("[resolver] empty result from polaris, recurse is not enabled, request %v, response for %s is nil",
-			req, question.Name)
-		d.sendDnsCode(w, req, dns.RcodeServerFailure)
-	}
-	// 降级到本地 nameserver
-	d.handleRecurse(w, req)
-}
-
-// handleRecurse is used to handle recursive DNS queries
-func (d *dnsServer) handleRecurse(resp dns.ResponseWriter, req *dns.Msg) {
-	q := req.Question[0]
-	network := "udp"
-	defer func(s time.Time) {
-		log.Infof("[resolver] request served from polaris, "+
-			"question: %s, network: %s, latency: %s, polaris: %s, client_network: %s",
-			q.String(), network, time.Since(s).String(), resp.RemoteAddr().String(), resp.RemoteAddr().Network())
-	}(time.Now())
-
-	// Switch to TCP if the polaris is
-	if _, ok := resp.RemoteAddr().(*net.TCPAddr); ok {
-		network = "tcp"
-	}
-
-	// Recursively resolve
-	c := &dns.Client{Net: network, Timeout: time.Duration(d.resolveConfig.Timeout) * time.Second}
-	var r *dns.Msg
-	var rtt time.Duration
-	var err error
-	// TODO: 增加对 ndots 和 options 配置的处理
-	for _, recursor := range d.resolveConfig.Servers {
-		r, rtt, err = c.Exchange(req, recursor)
-		// 只要是 0（NOERROR） 或 3（NXDOMAIN），resolver 不会轮询
-		if r != nil && (r.Rcode != dns.RcodeSuccess && r.Rcode != dns.RcodeNameError) {
-			log.Warnf("[resolver] recurse failed for question, question: %s, rtt: %s, recursor: %s, rcode: %s",
-				q.String(), rtt, recursor, dns.RcodeToString[r.Rcode])
-			// If we still have recursors to forward the query to,
-			// we move forward onto the next one else the loop ends
-			continue
-		} else if err == nil || (r != nil && r.Truncated) {
-			// 当r.Truncated为true时，即使响应被截断，也视为成功响应。服务器会转发这个被截断的响应给客户端
-			// 客户端负责使用TCP重新查询以获取完整响应
-			// Forward the response
-			log.Infof("[resolver] recurse succeeded for question, question: %s, rtt: %s, recursor: %s",
-				q.String(), rtt, recursor)
-			if err := resp.WriteMsg(r); err != nil {
-				log.Warnf("failed to respond, error: %v", err)
-			}
-			return
-		}
-		log.Errorf("[resolver] recurse failed, error: %v", err)
-	}
-
-	// If all resolvers fail, return a SERVFAIL message
-	log.Errorf(
-		"[resolver] all resolvers failed for question from polaris, question: %s, polaris: %s, client_network: %s",
-		q.String(), resp.RemoteAddr().String(), resp.RemoteAddr().Network())
-	d.sendDnsCode(resp, req, dns.RcodeServerFailure)
-}
-
-// Size returns if buffer size *advertised* in the requests OPT record.
-// Or when the request was over TCP, we return the maximum allowed size of 64K.
-func size(proto string, r *dns.Msg) int {
-	size := uint16(0)
-	if o := r.IsEdns0(); o != nil {
-		size = o.UDPSize()
-	}
-
-	// normalize size
-	size = ednsSize(proto, size)
-	return int(size)
-}
-
-// ednsSize returns a normalized size based on proto.
-func ednsSize(proto string, size uint16) uint16 {
-	if proto == "tcp" {
-		return dns.MaxMsgSize
-	}
-	if size < dns.MinMsgSize {
-		return dns.MinMsgSize
-	}
-	return size
-}
-
-func ednsSubnetForRequest(req *dns.Msg) *dns.EDNS0_SUBNET {
-	// IsEdns0 returns the EDNS RR if present or nil otherwise
-	edns := req.IsEdns0()
-
-	if edns == nil {
-		return nil
-	}
-
-	for _, o := range edns.Option {
-		if subnet, ok := o.(*dns.EDNS0_SUBNET); ok {
-			return subnet
-		}
-	}
-
-	return nil
-}
-
-// setEDNS is used to set the responses EDNS size headers and
-// possibly the ECS headers as well if they were present in the
-// original request
-func setEDNS(request *dns.Msg, response *dns.Msg, ecsGlobal bool) {
-	edns := request.IsEdns0()
-	if edns == nil {
-		return
-	}
-
-	// cannot just use the SetEdns0 function as we need to embed
-	// the ECS option as well
-	ednsResp := new(dns.OPT)
-	ednsResp.Hdr.Name = "."
-	ednsResp.Hdr.Rrtype = dns.TypeOPT
-	ednsResp.SetUDPSize(edns.UDPSize())
-
-	// Setup the ECS option if present
-	if subnet := ednsSubnetForRequest(request); subnet != nil {
-		subOp := new(dns.EDNS0_SUBNET)
-		subOp.Code = dns.EDNS0SUBNET
-		subOp.Family = subnet.Family
-		subOp.Address = subnet.Address
-		subOp.SourceNetmask = subnet.SourceNetmask
-		if c := response.Rcode; ecsGlobal || c == dns.RcodeNameError || c == dns.RcodeServerFailure ||
-			c == dns.RcodeRefused || c == dns.RcodeNotImplemented {
-			// reply is globally valid and should be cached accordingly
-			subOp.SourceScope = 0
-		} else {
-			// reply is only valid for the subnet it was queried with
-			subOp.SourceScope = subnet.SourceNetmask
-		}
-		ednsResp.Option = append(ednsResp.Option, subOp)
-	}
-
-	response.Extra = append(response.Extra, ednsResp)
 }

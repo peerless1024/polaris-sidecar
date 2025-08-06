@@ -19,6 +19,8 @@ package resolver
 
 import (
 	"testing"
+
+	"github.com/polarismesh/polaris-sidecar/internal/resolver/recursor"
 )
 
 func Test_dnsHandler_preprocess(t *testing.T) {
@@ -34,6 +36,16 @@ func Test_dnsHandler_preprocess(t *testing.T) {
 		args   args
 		want   string
 	}{
+		{
+			name: "",
+			fields: fields{
+				searchNames: []string{"polaris-system.svc.cluster.local", "svc.cluster.local", "cluster.local"},
+			},
+			args: args{
+				qname: "polaris.polaris-system.polaris-system.svc.cluster.local.",
+			},
+			want: "polaris.polaris-system.",
+		},
 		{
 			name: "",
 			fields: fields{
@@ -77,8 +89,10 @@ func Test_dnsHandler_preprocess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d := &dnsServer{
-				searchNames: tt.fields.searchNames,
+			d := &dnsHandler{
+				recurseProxy: recursor.BuildProxy(&recursor.Config{
+					Search: tt.fields.searchNames,
+				}),
 			}
 			if got := d.Preprocess(tt.args.qname); got != tt.want {
 				t.Errorf("dnsHandler.preprocess() = %v, want %v", got, tt.want)
