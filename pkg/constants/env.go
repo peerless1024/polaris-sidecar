@@ -1,4 +1,4 @@
-package config
+package constants
 
 const (
 	EnvPolarisAddress                  = "POLARIS_ADDRESS"
@@ -26,8 +26,4 @@ const (
 	EnvSidecarRLSEnable                = "SIDECAR_RLS_ENABLE"
 	EnvSidecarMetricEnable             = "SIDECAR_METRIC_ENABLE"
 	EnvSidecarMetricListenPort         = "SIDECAR_METRIC_LISTEN_PORT"
-)
-
-const (
-	defaultSvcSuffix = "."
 )

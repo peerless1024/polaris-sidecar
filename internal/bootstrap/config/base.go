@@ -32,7 +32,6 @@ import (
 	"github.com/polarismesh/polaris-sidecar/internal/mesh/mtls"
 	"github.com/polarismesh/polaris-sidecar/internal/mesh/rls"
 	"github.com/polarismesh/polaris-sidecar/internal/resolver"
-	"github.com/polarismesh/polaris-sidecar/internal/resolver/meshproxy"
 	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 )
@@ -107,16 +106,16 @@ func defaultSidecarConfig() *SidecarConfig {
 				Name:   resolver.PluginNameDnsAgent,
 				DnsTtl: 10,
 				Enable: true,
-				Suffix: defaultSvcSuffix,
+				Suffix: constants.DotSymbol,
 			},
 			{
 				Name:   resolver.PluginNameMeshProxy,
 				DnsTtl: 120,
 				Enable: false,
-				Suffix: defaultSvcSuffix,
+				Suffix: constants.DotSymbol,
 				Option: map[string]interface{}{
-					"reload_interval_sec": meshproxy.DefaultReloadIntervalSec,
-					"dns_answer_ip":       meshproxy.DefaultDnsAnswerIp,
+					"reload_interval_sec": constants.MeshDefaultReloadIntervalSec,
+					"dns_answer_ip":       constants.MeshDefaultDnsAnswerIp,
 				},
 			},
 		},

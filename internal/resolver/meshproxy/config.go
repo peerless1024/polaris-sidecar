@@ -22,11 +22,6 @@ import (
 	"fmt"
 )
 
-const (
-	DefaultDnsAnswerIp       = "10.4.4.4"
-	DefaultReloadIntervalSec = 30
-)
-
 type resolverConfig struct {
 	Namespace          string `json:"namespace"`
 	ReloadIntervalSec  int    `json:"reload_interval_sec"`

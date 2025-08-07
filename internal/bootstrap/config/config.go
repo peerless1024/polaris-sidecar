@@ -118,7 +118,7 @@ func (s *SidecarConfig) InitDnsServers() (*resolver.Server, error) {
 	var err error
 	var recurseProxyConf *recursor.Config
 	if s.Recurse.Enable {
-		recurseProxyConf, err = recursor.InitRecurseProxy(s.bindLocalhost(), s.Recurse.TimeoutSec,
+		recurseProxyConf, err = recursor.InitRecurseConfig(s.bindLocalhost(), s.Recurse.TimeoutSec,
 			s.Recurse.NameServers)
 		if err != nil {
 			log.Errorf("[bootstrap] fail to init recursor proxy config, err: %v", err)
@@ -209,49 +209,49 @@ func (s *SidecarConfig) mergeFileConfig(configFile string) error {
 }
 
 func (s *SidecarConfig) mergeEnv() {
-	s.Bind = getEnvStringValue(EnvSidecarBind, s.Bind)
-	s.Port = getEnvIntValue(EnvSidecarPort, s.Port)
-	s.Namespace = getEnvStringValue(EnvSidecarNamespace, s.Namespace)
-	s.PolarisConfig.Addresses = getEnvStringsValue(EnvPolarisAddress, s.PolarisConfig.Addresses)
-	s.Recurse.Enable = getEnvBoolValue(EnvSidecarRecurseEnable, s.Recurse.Enable)
-	s.Recurse.TimeoutSec = getEnvIntValue(EnvSidecarRecurseTimeout, s.Recurse.TimeoutSec)
-	s.Logger.RotateOutputPath = getEnvStringValue(EnvSidecarLogRotateOutputPath, s.Logger.RotateOutputPath)
-	s.Logger.ErrorRotateOutputPath = getEnvStringValue(EnvSidecarLogErrorRotateOutputPath, s.Logger.ErrorRotateOutputPath)
-	s.Logger.RotationMaxSize = getEnvIntValue(EnvSidecarLogRotationMaxSize, s.Logger.RotationMaxSize)
-	s.Logger.RotationMaxBackups = getEnvIntValue(EnvSidecarLogRotationMaxBackups, s.Logger.RotationMaxBackups)
-	s.Logger.RotationMaxAge = getEnvIntValue(EnvSidecarLogRotationMaxAge, s.Logger.RotationMaxAge)
-	s.Logger.OutputLevel = getEnvStringValue(EnvSidecarLogLevel, s.Logger.OutputLevel)
+	s.Bind = getEnvStringValue(constants.EnvSidecarBind, s.Bind)
+	s.Port = getEnvIntValue(constants.EnvSidecarPort, s.Port)
+	s.Namespace = getEnvStringValue(constants.EnvSidecarNamespace, s.Namespace)
+	s.PolarisConfig.Addresses = getEnvStringsValue(constants.EnvPolarisAddress, s.PolarisConfig.Addresses)
+	s.Recurse.Enable = getEnvBoolValue(constants.EnvSidecarRecurseEnable, s.Recurse.Enable)
+	s.Recurse.TimeoutSec = getEnvIntValue(constants.EnvSidecarRecurseTimeout, s.Recurse.TimeoutSec)
+	s.Logger.RotateOutputPath = getEnvStringValue(constants.EnvSidecarLogRotateOutputPath, s.Logger.RotateOutputPath)
+	s.Logger.ErrorRotateOutputPath = getEnvStringValue(constants.EnvSidecarLogErrorRotateOutputPath, s.Logger.ErrorRotateOutputPath)
+	s.Logger.RotationMaxSize = getEnvIntValue(constants.EnvSidecarLogRotationMaxSize, s.Logger.RotationMaxSize)
+	s.Logger.RotationMaxBackups = getEnvIntValue(constants.EnvSidecarLogRotationMaxBackups, s.Logger.RotationMaxBackups)
+	s.Logger.RotationMaxAge = getEnvIntValue(constants.EnvSidecarLogRotationMaxAge, s.Logger.RotationMaxAge)
+	s.Logger.OutputLevel = getEnvStringValue(constants.EnvSidecarLogLevel, s.Logger.OutputLevel)
 	if len(s.Resolvers) > 0 {
 		for _, resolverConf := range s.Resolvers {
 			resolverConf.Namespace = s.Namespace
 			if resolverConf.Name == resolver.PluginNameDnsAgent {
-				resolverConf.DnsTtl = getEnvIntValue(EnvSidecarDnsTtl, resolverConf.DnsTtl)
-				resolverConf.Enable = getEnvBoolValue(EnvSidecarDnsEnable, resolverConf.Enable)
-				resolverConf.Suffix = getEnvStringValue(EnvSidecarDnsSuffix, resolverConf.Suffix)
-				routeLabels := getEnvStringValue(EnvSidecarDnsRouteLabels, "")
+				resolverConf.DnsTtl = getEnvIntValue(constants.EnvSidecarDnsTtl, resolverConf.DnsTtl)
+				resolverConf.Enable = getEnvBoolValue(constants.EnvSidecarDnsEnable, resolverConf.Enable)
+				resolverConf.Suffix = getEnvStringValue(constants.EnvSidecarDnsSuffix, resolverConf.Suffix)
+				routeLabels := getEnvStringValue(constants.EnvSidecarDnsRouteLabels, "")
 				if len(routeLabels) > 0 {
 					resolverConf.Option = make(map[string]interface{})
 					resolverConf.Option["route_labels"] = routeLabels
 				}
 			} else if resolverConf.Name == resolver.PluginNameMeshProxy {
-				resolverConf.DnsTtl = getEnvIntValue(EnvSidecarMeshTtl, resolverConf.DnsTtl)
-				resolverConf.Enable = getEnvBoolValue(EnvSidecarMeshEnable, resolverConf.Enable)
-				reloadIntervalSec := getEnvIntValue(EnvSidecarMeshReloadInterval, 0)
+				resolverConf.DnsTtl = getEnvIntValue(constants.EnvSidecarMeshTtl, resolverConf.DnsTtl)
+				resolverConf.Enable = getEnvBoolValue(constants.EnvSidecarMeshEnable, resolverConf.Enable)
+				reloadIntervalSec := getEnvIntValue(constants.EnvSidecarMeshReloadInterval, 0)
 				if reloadIntervalSec > 0 {
 					resolverConf.Option["reload_interval_sec"] = reloadIntervalSec
 				}
-				dnsAnswerIP := getEnvStringValue(EnvSidecarMeshAnswerIp, "")
+				dnsAnswerIP := getEnvStringValue(constants.EnvSidecarMeshAnswerIp, "")
 				if len(dnsAnswerIP) > 0 {
 					resolverConf.Option["dns_answer_ip"] = dnsAnswerIP
 				}
 			}
 		}
 	}
-	s.MeshConfig.MTLS.Enable = getEnvBoolValue(EnvSidecarMtlsEnable, s.MeshConfig.MTLS.Enable)
-	s.MeshConfig.MTLS.CAServer = getEnvStringValue(EnvSidecarMtlsCAServer, s.MeshConfig.MTLS.CAServer)
-	s.MeshConfig.RateLimit.Enable = getEnvBoolValue(EnvSidecarRLSEnable, s.MeshConfig.RateLimit.Enable)
-	s.MeshConfig.Metrics.Enable = getEnvBoolValue(EnvSidecarMetricEnable, s.MeshConfig.Metrics.Enable)
-	s.MeshConfig.Metrics.Port = getEnvIntValue(EnvSidecarMetricListenPort, s.MeshConfig.Metrics.Port)
+	s.MeshConfig.MTLS.Enable = getEnvBoolValue(constants.EnvSidecarMtlsEnable, s.MeshConfig.MTLS.Enable)
+	s.MeshConfig.MTLS.CAServer = getEnvStringValue(constants.EnvSidecarMtlsCAServer, s.MeshConfig.MTLS.CAServer)
+	s.MeshConfig.RateLimit.Enable = getEnvBoolValue(constants.EnvSidecarRLSEnable, s.MeshConfig.RateLimit.Enable)
+	s.MeshConfig.Metrics.Enable = getEnvBoolValue(constants.EnvSidecarMetricEnable, s.MeshConfig.Metrics.Enable)
+	s.MeshConfig.Metrics.Port = getEnvIntValue(constants.EnvSidecarMetricListenPort, s.MeshConfig.Metrics.Port)
 	log.Infof("[config] sidecar config merged with env: \n%s", s.String())
 }
 

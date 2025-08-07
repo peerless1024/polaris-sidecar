@@ -1,6 +1,7 @@
 package recursor
 
 import (
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	"github.com/polarismesh/polaris-sidecar/internal/resolver/common"
 	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
+	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
 type Proxy struct {
@@ -48,6 +50,7 @@ func (r *RotatingUpstream) Next() string {
 	return server
 }
 
+// HandleDNS 降级到本地代理处理DNS请求
 func (p *Proxy) HandleDNS(protocol string, w dns.ResponseWriter, r *dns.Msg) {
 	startTime := time.Now()
 	clientAddr := w.RemoteAddr()
@@ -59,13 +62,13 @@ func (p *Proxy) HandleDNS(protocol string, w dns.ResponseWriter, r *dns.Msg) {
 	}
 	// 延迟记录日志
 	defer func() {
-		log.Infof("[resolver] recurse question: %s, network: %s, latency: %s, client_addr: %s, client_network: %s",
-			q.String(), network, time.Since(startTime).String(), clientAddr.String(), clientAddr.Network())
+		log.Infof("[recursor] question: %s, protocol: %s, latency: %s, client_addr: %s, client_network: %s",
+			q.String(), protocol, time.Since(startTime).String(), clientAddr.String(), clientAddr.Network())
 	}()
 	// 根据 ndots 和 search 配置生成带解析域名列表
 	domains := p.expandQuery(q.Name)
 	// 创建DNS客户端
-	client := &dns.Client{Timeout: time.Duration(p.config.Timeout) * time.Second}
+	client := &dns.Client{Net: network, Timeout: time.Duration(p.config.Timeout) * time.Second}
 	// 开始解析
 	for _, domain := range domains {
 		req := r.Copy()
@@ -74,35 +77,32 @@ func (p *Proxy) HandleDNS(protocol string, w dns.ResponseWriter, r *dns.Msg) {
 		for i := 0; i < p.config.Attempts; i++ {
 			upstream := p.rotate.Next()
 			r, rtt, err := client.Exchange(req, upstream)
-			// 处理服务器返回的响应
-			switch { //TODO 重新梳理
-			case r != nil && !isAcceptableRcode(r.Rcode):
-				log.Warnf("[resolver] recurse failed for question, question: %s, rtt: %s, recursor: %s, rcode: %s",
-					req.String(), rtt, upstream, dns.RcodeToString[r.Rcode])
+			resInfo := fmt.Sprintf("upstream: %s, req: %s, rtt: %s, err:%v, resp:%s", upstream, req.String(), rtt,
+				err, getDnsMsg(r))
 
-			case shouldAcceptResponse(err, r):
-				log.Infof("[resolver] recurse succeeded for question, question: %s, rtt: %s, recursor: %s",
-					req.String(), rtt, upstream)
-				if err := w.WriteMsg(r); err != nil {
-					log.Warnf("failed to respond to client: %v", err)
+			switch {
+			case r != nil && !(r.Rcode == dns.RcodeSuccess || r.Rcode == dns.RcodeNameError):
+				// 如果返回的响应码不是NOERROR（0查询成功）或者NXDOMAIN（3域名不存在），则仅记录日志，尝试下一个DNS服务器
+				log.Warnf("[recursor] need retry for dns rcode not pass, info:%s", resInfo)
+			case err == nil || (r != nil && r.Truncated):
+				// 如果没有错误，或者有错误但是响应被截断，都返回响应，并退出循环
+				// 客户端如果感知到响应被截断，会自动切换成 TCP 协议重试
+				if err = w.WriteMsg(r); err != nil {
+					log.Warnf("[recursor] failed to respond to client: %v", err)
 				}
+				log.Infof("[recursor] return for query succeeded, info:%s, ", resInfo)
 				return
-
 			default:
-				log.Errorf("[resolver] recurse failed, nameserver:%s, error: %v", upstream, err)
+				log.Warnf("[recursor] need retry for query failed, info:%s", resInfo)
 			}
-			log.Errorf("查询 %s 失败 (尝试 %d): %v", domain, i+1, err)
+			log.Errorf("nameserver %s query %s failed (try %d times): %v", upstream, domain, i+1, err)
 		}
 	}
+	// If all resolvers fail, return a SERVFAIL message
+	log.Errorf("[recursor] question: %s, protocol: %s, latency: %s, client_addr: %s, client_network: %s, domains:%s",
+		q.String(), protocol, time.Since(startTime).String(), clientAddr.String(), clientAddr.Network(),
+		utils.JsonString(domains))
 	common.WriteDnsCode(protocol, w, r, dns.RcodeServerFailure)
-}
-
-func isAcceptableRcode(rcode int) bool {
-	return rcode == dns.RcodeSuccess || rcode == dns.RcodeNameError
-}
-
-func shouldAcceptResponse(err error, r *dns.Msg) bool {
-	return err == nil || (r != nil && r.Truncated)
 }
 
 func (p *Proxy) expandQuery(name string) []string {
@@ -116,4 +116,11 @@ func (p *Proxy) expandQuery(name string) []string {
 		return expanded
 	}
 	return []string{name}
+}
+
+func getDnsMsg(r *dns.Msg) string {
+	if r == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("code:%s, msg:%s", dns.RcodeToString[r.Rcode], r.String())
 }

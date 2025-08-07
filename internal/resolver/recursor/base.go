@@ -12,15 +12,16 @@ const (
 	localIp           = "127.0.0.1"
 )
 
+// Config 递归代理配置
 type Config struct {
 	Ndots    int      // 触发搜索域的最小点数
 	Search   []string // 搜索域列表（如 ["cluster.local", "svc.cluster.local"]）
 	Timeout  int      // 单次查询超时（秒）
-	Attempts int      // 最大重试次数 TODO 默认为上游服务器数量
+	Attempts int      // 最大重试次数
 	Upstream []string // 上游DNS服务器（如 ["8.8.8.8:53", "1.1.1.1:53"]）
 }
 
-func InitRecurseProxy(bindLocalhost bool, timeout int, nameServers []string) (*Config, error) {
+func InitRecurseConfig(bindLocalhost bool, timeout int, nameServers []string) (*Config, error) {
 	if !utils.IsFile(etcResolvConfPath) {
 		log.Infof("[recursor] /etc/resolv.conf is not exist, skip to parse it")
 		return nil, nil
@@ -32,20 +33,28 @@ func InitRecurseProxy(bindLocalhost bool, timeout int, nameServers []string) (*C
 	}
 	log.Infof("[recursor] successfully loaded etcResolvConf:%s", utils.JsonString(dnsConfig))
 	config := &Config{
-		Timeout:  timeout,
+		Timeout:  getBigger(timeout, dnsConfig.Timeout),
 		Upstream: make([]string, 0),
 	}
 	nameServerMap := make(map[string]bool)
-	// 优先配置项里的 dns 服务器
+	// 优先将配置项里的 dns 服务器加入 upstream
 	config.mergeUpstream(bindLocalhost, nameServerMap, nameServers)
-	// 其次本地配置的 dns 服务器
+	// 其次将本地配置的 dns 服务器加入 upstream
 	config.mergeUpstream(bindLocalhost, nameServerMap, dnsConfig.Servers)
+	// 补充其他配置
+	config.fillByResolvConfig(dnsConfig)
 	log.Infof("[recursor] init recursor proxy config: %v", config.String())
 	return config, nil
 }
 
 func (r *Config) String() string {
 	return utils.JsonString(r)
+}
+
+func (r *Config) fillByResolvConfig(dnsConfig *dns.ClientConfig) {
+	r.Ndots = dnsConfig.Ndots
+	r.Search = dnsConfig.Search
+	r.Attempts = getBigger(dnsConfig.Attempts, len(r.Upstream))
 }
 
 func (r *Config) mergeUpstream(bindLocalhost bool, nameServerMap map[string]bool, nameServers []string) {
@@ -55,6 +64,13 @@ func (r *Config) mergeUpstream(bindLocalhost bool, nameServerMap map[string]bool
 			nameServerMap[nameServer] = true
 		}
 	}
+}
+
+func getBigger(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func needSkip(bindLocalhost bool, nameServer string) bool {
