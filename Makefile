@@ -60,8 +60,9 @@ build-docker: ## Build polaris-server docker images.
 ##@ Clean
 .PHONY: clean
 clean: ## Clean polaris-server make data.
+	@rm -f polaris-sidecar
 	@rm -rf polaris-sidecar-release_*
-	@rm -rf polaris-sideacr-arm64
+	@rm -rf polaris-sidecar-arm64
 	@rm -rf polaris-sidecar-amd64
 
 ##@ Test

@@ -32,6 +32,7 @@ import (
 	"github.com/polarismesh/polaris-sidecar/internal/mesh/mtls"
 	"github.com/polarismesh/polaris-sidecar/internal/mesh/rls"
 	"github.com/polarismesh/polaris-sidecar/internal/resolver"
+	"github.com/polarismesh/polaris-sidecar/internal/resolver/common"
 	"github.com/polarismesh/polaris-sidecar/internal/resolver/recursor"
 	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
@@ -41,17 +42,17 @@ import (
 
 // SidecarConfig global sidecar config struct
 type SidecarConfig struct {
-	Namespace     string                  `yaml:"namespace"`
-	PolarisConfig *PolarisConfig          `yaml:"polaris"`
-	Bind          string                  `yaml:"bind"`
-	Port          int                     `yaml:"port"`
-	Logger        *log.Options            `yaml:"logger"`
-	Recurse       *RecurseConfig          `yaml:"recurse"`
-	Resolvers     []*resolver.ConfigEntry `yaml:"resolvers"`
-	MeshConfig    *MeshConfig             `yaml:"mesh"`
-	Debugger      *debugger.DebugConfig   `yaml:"debugger"`
-	DnsEnabled    bool                    `yaml:"-"`
-	MeshEnabled   bool                    `yaml:"-"`
+	Namespace     string                `yaml:"namespace"`
+	PolarisConfig *PolarisConfig        `yaml:"polaris"`
+	Bind          string                `yaml:"bind"`
+	Port          int                   `yaml:"port"`
+	Logger        *log.Options          `yaml:"logger"`
+	Recurse       *RecurseConfig        `yaml:"recurse"`
+	Resolvers     []*common.ConfigEntry `yaml:"resolvers"`
+	MeshConfig    *MeshConfig           `yaml:"mesh"`
+	Debugger      *debugger.DebugConfig `yaml:"debugger"`
+	DnsEnabled    bool                  `yaml:"-"`
+	MeshEnabled   bool                  `yaml:"-"`
 }
 
 type PolarisConfig struct {
@@ -110,7 +111,7 @@ func (s *SidecarConfig) InitPolarisApi() error {
 
 // InitDnsServers initializes the DNS servers based on the configuration.
 func (s *SidecarConfig) InitDnsServers() (*resolver.Server, error) {
-	resolveConfig := &resolver.ResolverConfig{
+	resolveConfig := &common.ResolverConfig{
 		BindIP:    s.Bind,
 		BindPort:  uint32(s.Port),
 		Resolvers: s.Resolvers,
@@ -224,7 +225,7 @@ func (s *SidecarConfig) mergeEnv() {
 	if len(s.Resolvers) > 0 {
 		for _, resolverConf := range s.Resolvers {
 			resolverConf.Namespace = s.Namespace
-			if resolverConf.Name == resolver.PluginNameDnsAgent {
+			if resolverConf.Name == common.PluginNameDnsAgent {
 				resolverConf.DnsTtl = getEnvIntValue(constants.EnvSidecarDnsTtl, resolverConf.DnsTtl)
 				resolverConf.Enable = getEnvBoolValue(constants.EnvSidecarDnsEnable, resolverConf.Enable)
 				resolverConf.Suffix = getEnvStringValue(constants.EnvSidecarDnsSuffix, resolverConf.Suffix)
@@ -233,7 +234,7 @@ func (s *SidecarConfig) mergeEnv() {
 					resolverConf.Option = make(map[string]interface{})
 					resolverConf.Option["route_labels"] = routeLabels
 				}
-			} else if resolverConf.Name == resolver.PluginNameMeshProxy {
+			} else if resolverConf.Name == common.PluginNameMeshProxy {
 				resolverConf.DnsTtl = getEnvIntValue(constants.EnvSidecarMeshTtl, resolverConf.DnsTtl)
 				resolverConf.Enable = getEnvBoolValue(constants.EnvSidecarMeshEnable, resolverConf.Enable)
 				reloadIntervalSec := getEnvIntValue(constants.EnvSidecarMeshReloadInterval, 0)
@@ -278,7 +279,7 @@ func (s *SidecarConfig) mergeBootConfig(config *BootConfig) error {
 	s.Logger.OutputLevel = config.LogLevel
 	if len(config.ResolverDnsAgentEnabled) > 0 || len(config.ResolverDnsAgentRouteLabels) > 0 {
 		for _, resolverConfig := range s.Resolvers {
-			if resolverConfig.Name == resolver.PluginNameDnsAgent {
+			if resolverConfig.Name == common.PluginNameDnsAgent {
 				if len(config.ResolverDnsAgentEnabled) > 0 {
 					resolverConfig.Enable, err = strconv.ParseBool(config.ResolverDnsAgentEnabled)
 					if nil != err {
@@ -297,7 +298,7 @@ func (s *SidecarConfig) mergeBootConfig(config *BootConfig) error {
 				}
 				continue
 			}
-			if resolverConfig.Name == resolver.PluginNameMeshProxy {
+			if resolverConfig.Name == common.PluginNameMeshProxy {
 				if len(config.ResolverMeshProxyEnabled) > 0 {
 					resolverConfig.Enable, err = strconv.ParseBool(config.ResolverMeshProxyEnabled)
 					if nil != err {
@@ -339,9 +340,9 @@ func (s *SidecarConfig) verify() error {
 				idx))
 		}
 		if resolverConfig.Enable {
-			if resolverConfig.Name == resolver.PluginNameDnsAgent {
+			if resolverConfig.Name == common.PluginNameDnsAgent {
 				s.DnsEnabled = true
-			} else if resolverConfig.Name == resolver.PluginNameMeshProxy {
+			} else if resolverConfig.Name == common.PluginNameMeshProxy {
 				s.MeshEnabled = true
 			}
 		}

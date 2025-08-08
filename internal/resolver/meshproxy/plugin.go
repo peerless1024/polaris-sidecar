@@ -25,13 +25,13 @@ import (
 	"github.com/polarismesh/polaris-go"
 
 	debughttp "github.com/polarismesh/polaris-sidecar/internal/debugger"
-	"github.com/polarismesh/polaris-sidecar/internal/resolver"
+	"github.com/polarismesh/polaris-sidecar/internal/resolver/common"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 	polarisApi "github.com/polarismesh/polaris-sidecar/pkg/polaris"
 	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
-const name = resolver.PluginNameMeshProxy
+const name = common.PluginNameMeshProxy
 
 type resolverMesh struct {
 	localDNSServer *LocalDNSServer
@@ -42,7 +42,7 @@ type resolverMesh struct {
 }
 
 func init() {
-	resolver.Register(&resolverMesh{})
+	common.Register(&resolverMesh{})
 }
 
 // Name will return the name to resolver
@@ -51,7 +51,7 @@ func (r *resolverMesh) Name() string {
 }
 
 // Initialize will init the resolver on startup
-func (r *resolverMesh) Initialize(c *resolver.ConfigEntry) error {
+func (r *resolverMesh) Initialize(c *common.ConfigEntry) error {
 	var err error
 	r.config, err = parseOptions(c.Option)
 	if nil != err {

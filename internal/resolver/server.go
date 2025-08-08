@@ -27,19 +27,22 @@ import (
 	"github.com/miekg/dns"
 
 	debughttp "github.com/polarismesh/polaris-sidecar/internal/debugger"
+	"github.com/polarismesh/polaris-sidecar/internal/resolver/common"
+	_ "github.com/polarismesh/polaris-sidecar/internal/resolver/dnsagent"
+	_ "github.com/polarismesh/polaris-sidecar/internal/resolver/meshproxy"
 	"github.com/polarismesh/polaris-sidecar/internal/resolver/recursor"
 	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 )
 
-func NewServer(conf *ResolverConfig, recurseProxyConf *recursor.Config) (*Server, error) {
-	namingResolvers := make([]NamingResolver, 0, len(conf.Resolvers))
+func NewServer(conf *common.ResolverConfig, recurseProxyConf *recursor.Config) (*Server, error) {
+	namingResolvers := make([]common.NamingResolver, 0, len(conf.Resolvers))
 	for _, resolverCfg := range conf.Resolvers {
 		if !resolverCfg.Enable {
 			log.Infof("[resolver] resolver %s is not enabled", resolverCfg.Name)
 			continue
 		}
-		handler := NameResolver(resolverCfg.Name)
+		handler := common.NameResolver(resolverCfg.Name)
 		if nil == handler {
 			log.Errorf("[resolver] resolver %s is not found", resolverCfg.Name)
 			return nil, fmt.Errorf("fail to lookup resolver %s, consider it's not registered", resolverCfg.Name)
@@ -81,7 +84,7 @@ func NewServer(conf *ResolverConfig, recurseProxyConf *recursor.Config) (*Server
 
 type Server struct {
 	dnsSeverList []*dns.Server
-	resolvers    []NamingResolver
+	resolvers    []common.NamingResolver
 	once         sync.Once
 }
 

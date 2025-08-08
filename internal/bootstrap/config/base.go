@@ -31,7 +31,7 @@ import (
 	"github.com/polarismesh/polaris-sidecar/internal/mesh/metrics"
 	"github.com/polarismesh/polaris-sidecar/internal/mesh/mtls"
 	"github.com/polarismesh/polaris-sidecar/internal/mesh/rls"
-	"github.com/polarismesh/polaris-sidecar/internal/resolver"
+	"github.com/polarismesh/polaris-sidecar/internal/resolver/common"
 	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 )
@@ -101,15 +101,15 @@ func defaultSidecarConfig() *SidecarConfig {
 			RotationMaxSize:       100,
 			OutputLevel:           "info",
 		},
-		Resolvers: []*resolver.ConfigEntry{
+		Resolvers: []*common.ConfigEntry{
 			{
-				Name:   resolver.PluginNameDnsAgent,
+				Name:   common.PluginNameDnsAgent,
 				DnsTtl: 10,
 				Enable: true,
 				Suffix: constants.DotSymbol,
 			},
 			{
-				Name:   resolver.PluginNameMeshProxy,
+				Name:   common.PluginNameMeshProxy,
 				DnsTtl: 120,
 				Enable: false,
 				Suffix: constants.DotSymbol,

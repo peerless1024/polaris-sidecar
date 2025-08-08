@@ -12,7 +12,7 @@ import (
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 )
 
-func buildDnsHandler(protocol string, resolvers []NamingResolver, recurseProxy *recursor.Proxy) *dnsHandler {
+func buildDnsHandler(protocol string, resolvers []common.NamingResolver, recurseProxy *recursor.Proxy) *dnsHandler {
 	return &dnsHandler{
 		protocol:     protocol,
 		resolvers:    resolvers,
@@ -22,7 +22,7 @@ func buildDnsHandler(protocol string, resolvers []NamingResolver, recurseProxy *
 
 type dnsHandler struct {
 	protocol     string
-	resolvers    []NamingResolver
+	resolvers    []common.NamingResolver
 	recurseProxy *recursor.Proxy
 }
 

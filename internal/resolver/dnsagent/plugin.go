@@ -29,17 +29,17 @@ import (
 	"go.uber.org/zap"
 
 	debughttp "github.com/polarismesh/polaris-sidecar/internal/debugger"
-	"github.com/polarismesh/polaris-sidecar/internal/resolver"
+	"github.com/polarismesh/polaris-sidecar/internal/resolver/common"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 	polarisApi "github.com/polarismesh/polaris-sidecar/pkg/polaris"
 	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
 func init() {
-	resolver.Register(&resolverDiscovery{})
+	common.Register(&resolverDiscovery{})
 }
 
-const name = resolver.PluginNameDnsAgent
+const name = common.PluginNameDnsAgent
 
 type resolverDiscovery struct {
 	consumer  polaris.ConsumerAPI
@@ -55,7 +55,7 @@ func (r *resolverDiscovery) Name() string {
 }
 
 // Initialize will init the resolver on startup
-func (r *resolverDiscovery) Initialize(c *resolver.ConfigEntry) error {
+func (r *resolverDiscovery) Initialize(c *common.ConfigEntry) error {
 	var err error
 	defer func() {
 		if nil != err {
