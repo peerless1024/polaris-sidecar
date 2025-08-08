@@ -33,9 +33,9 @@ const (
 )
 
 type ResolverConfig struct {
-	BindIP        string
-	BindPort      uint32
-	Resolvers     []*ConfigEntry
+	BindIP    string
+	BindPort  uint32
+	Resolvers []*ConfigEntry
 }
 
 // ConfigEntry: resolver plugin config entry

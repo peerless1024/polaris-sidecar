@@ -27,12 +27,11 @@ import (
 
 	v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/common/ratelimit/v3"
 	pb "github.com/envoyproxy/go-control-plane/envoy/service/ratelimit/v3"
+	polarisgo "github.com/polarismesh/polaris-go"
 	"github.com/polarismesh/polaris-go/pkg/model"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-
-	polarisgo "github.com/polarismesh/polaris-go"
 
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 	polarisApi "github.com/polarismesh/polaris-sidecar/pkg/polaris"
