@@ -29,7 +29,7 @@ type dnsHandler struct {
 // Preprocess removes the search suffix from the query name if it is present.
 func (d *dnsHandler) Preprocess(qname string) string {
 	log.Debugf("[resolver] input question name %s", qname)
-	if d.recurseProxy == nil && len(d.recurseProxy.GetSearch()) == 0 {
+	if d.recurseProxy == nil || len(d.recurseProxy.GetSearch()) == 0 {
 		return qname
 	}
 	for _, searchName := range d.recurseProxy.GetSearch() {
@@ -57,22 +57,23 @@ func (d *dnsHandler) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	// questions type we only accept
 	question := req.Question[0]
 	qname := d.Preprocess(question.Name)
-	log.Debugf("[resolver] input question name %s, after Preprocess name %s", question.Name, qname)
+	log.Infof("[resolver] input question name %s, after Preprocess name %s", question.Name, qname)
 	ctx := context.WithValue(context.Background(), constants.ContextProtocol, d.protocol)
 	var resp *dns.Msg
 	for _, handler := range d.resolvers {
 		resp = handler.ServeDNS(ctx, question, qname)
 		if nil != resp {
-			log.Infof("[resolver] request %v, response for %s is %v", req, question.Name, resp)
 			common.WriteDnsResponse(d.protocol, w, req, resp)
+			log.Infof("[resolver] request %v, response for %s is %v", req.String(), question.Name, resp)
 			return
 		}
 	}
-	if d.recurseProxy == nil {
-		log.Errorf("[resolver] empty result from polaris, recurse is not enabled, request %v, response for %s is nil",
-			req, question.Name)
+	if d.recurseProxy != nil {
+		// 降级到本地 nameserver
+		d.recurseProxy.HandleDNS(d.protocol, w, req)
+	} else {
 		common.WriteDnsCode(d.protocol, w, req, dns.RcodeServerFailure)
+		log.Errorf("[resolver] empty result from polaris, recurse is not enabled, request %v, response for %s is nil",
+			req.String(), question.Name)
 	}
-	// 降级到本地 nameserver
-	d.recurseProxy.HandleDNS(d.protocol, w, req)
 }

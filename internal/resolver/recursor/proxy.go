@@ -62,8 +62,9 @@ func (p *Proxy) HandleDNS(protocol string, w dns.ResponseWriter, r *dns.Msg) {
 	}
 	// 延迟记录日志
 	defer func() {
-		log.Infof("[recursor] question: %s, protocol: %s, latency: %s, client_addr: %s, client_network: %s",
-			q.String(), protocol, time.Since(startTime).String(), clientAddr.String(), clientAddr.Network())
+		log.Infof("[recursor] question: (%s), protocol: %s, latency: %s, client_addr: %s, client_network: %s, "+
+			"config:%s", q.String(), protocol, time.Since(startTime).String(), clientAddr.String(),
+			clientAddr.Network(), p.config.String())
 	}()
 	// 根据 ndots 和 search 配置生成带解析域名列表
 	domains := p.expandQuery(q.Name)

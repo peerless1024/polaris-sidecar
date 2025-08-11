@@ -50,6 +50,10 @@ func (r *resolverMesh) Name() string {
 	return name
 }
 
+func (r *resolverMesh) String() string {
+	return utils.JsonString(r)
+}
+
 // Initialize will init the resolver on startup
 func (r *resolverMesh) Initialize(c *common.ConfigEntry) error {
 	var err error
@@ -139,6 +143,7 @@ func (r *resolverMesh) Start(ctx context.Context) {
 			}
 		}
 	}()
+	log.Infof("[mesh] %s resolver started, resolver data: %s", name, r.String())
 }
 
 func (r *resolverMesh) Debugger() []debughttp.DebugHandler {

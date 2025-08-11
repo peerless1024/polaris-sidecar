@@ -52,7 +52,10 @@ func (r *Config) String() string {
 }
 
 func (r *Config) fillByResolvConfig(dnsConfig *dns.ClientConfig) {
-	r.Ndots = dnsConfig.Ndots
+	r.Ndots = 1
+	if dnsConfig.Ndots > 0 {
+		r.Ndots = dnsConfig.Ndots
+	}
 	r.Search = dnsConfig.Search
 	r.Attempts = getBigger(dnsConfig.Attempts, len(r.Upstream))
 }

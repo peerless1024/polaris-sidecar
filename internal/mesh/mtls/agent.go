@@ -62,6 +62,9 @@ func New(opt Option) (*Agent, error) {
 }
 
 func (a *Agent) Run(ctx context.Context, errChan chan error) {
+	if a == nil {
+		return
+	}
 	log.Info("[envoy-mtls] start mtls agent")
 	defer func() {
 		a.Destroy()
@@ -75,14 +78,8 @@ func (a *Agent) Run(ctx context.Context, errChan chan error) {
 		return
 	}
 	a.ln = l
-	serveErr := make(chan error, 1)
 	go func() {
-		err = a.grpcSvr.Serve(l)
-		if err != nil {
-			log.Errorf("[envoy-mtls] start sds grpc service failed: %v", err)
-			serveErr <- err
-			return
-		}
+		errChan <- a.grpcSvr.Serve(l)
 	}()
 	log.Info("[envoy-mtls] start rotator")
 	// start certificate generation rotator
@@ -99,21 +96,8 @@ func (a *Agent) Run(ctx context.Context, errChan chan error) {
 		errChan <- err
 		return
 	}
-
-	for {
-		select {
-		case sErr := <-serveErr:
-			select {
-			case errChan <- sErr: // 尝试发送
-			default: // 通道满时记录日志
-				log.Errorf("[envoy-mtls] error channel full, drop error: %v", sErr)
-			}
-			return
-		case <-ctx.Done():
-			log.Infof("[envoy-mtls] receive stop signal")
-			return
-		}
-	}
+	<-ctx.Done()
+	log.Infof("[envoy-mtls] receive stop signal, return")
 }
 
 // Destroy stop the agent

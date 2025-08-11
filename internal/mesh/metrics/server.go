@@ -63,6 +63,9 @@ const (
 )
 
 func (s *Server) Run(ctx context.Context, errChan chan error) {
+	if s == nil {
+		return
+	}
 	log.Info("[envoy-metrics] start metric server")
 	defer func() {
 		s.Destroy()

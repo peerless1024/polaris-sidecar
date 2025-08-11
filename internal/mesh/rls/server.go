@@ -59,6 +59,9 @@ type RateLimitServer struct {
 }
 
 func (svr *RateLimitServer) Run(ctx context.Context, errChan chan error) {
+	if svr == nil {
+		return
+	}
 	log.Info("[envoy-rls] start ratelimit server")
 	defer func() {
 		svr.Destroy()
@@ -101,28 +104,11 @@ func (svr *RateLimitServer) Run(ctx context.Context, errChan chan error) {
 	}
 	svr.grpcSvr = grpc.NewServer(opts...)
 	pb.RegisterRateLimitServiceServer(svr.grpcSvr, svr)
-	serveErr := make(chan error, 1)
 	go func() {
-		if err = svr.grpcSvr.Serve(ln); err != nil {
-			log.Errorf("[envoy-rls] start grpc server error: %v", err)
-			serveErr <- err
-			return
-		}
+		errChan <- svr.grpcSvr.Serve(ln)
 	}()
-	for {
-		select {
-		case sErr := <-serveErr:
-			select {
-			case errChan <- sErr: // 尝试发送
-			default: // 通道满时记录日志
-				log.Errorf("[envoy-rls] error channel full, drop error: %v", sErr)
-			}
-			return
-		case <-ctx.Done():
-			log.Infof("[envoy-rls] get context cancel signal")
-			return
-		}
-	}
+	<-ctx.Done()
+	log.Infof("[envoy-rls] get context cancel signal")
 }
 
 func (svr *RateLimitServer) Destroy() {

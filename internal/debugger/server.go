@@ -34,6 +34,9 @@ func NewDebugServer(bind string, port int32) *DebugServer {
 }
 
 func (s *DebugServer) Run(ctx context.Context, errChan chan error) {
+	if s == nil {
+		return
+	}
 	log.Info("start debug server")
 	defer func() {
 		s.Destroy()
@@ -61,28 +64,12 @@ func (s *DebugServer) Run(ctx context.Context, errChan chan error) {
 	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	serveErr := make(chan error, 1)
 	go func() {
-		if err = s.svr.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Errorf("start debug server failed: %v", err)
-			serveErr <- err
-			return
-		}
+		errChan <- s.svr.Serve(ln)
 	}()
-	for {
-		select {
-		case sErr := <-serveErr:
-			select {
-			case errChan <- sErr: // 尝试发送
-			default: // 通道满时记录日志
-				log.Errorf("[debug-server] error channel full, drop error: %v", sErr)
-			}
-			return
-		case <-ctx.Done():
-			log.Infof("[debug-server] get context cancel signal")
-			return
-		}
-	}
+
+	<-ctx.Done()
+	log.Infof("[debug-server] get context cancel signal, return")
 }
 
 // Destroy 退出前关闭服务（确保幂等性）

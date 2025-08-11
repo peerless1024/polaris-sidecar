@@ -73,39 +73,27 @@ func initAgent(configFilePath string, bootConfig *config.BootConfig) (*Agent, er
 
 func (p *Agent) runServices(ctx context.Context) error {
 	errChan := p.getErrorChannel()
-	shutdownCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	var wg sync.WaitGroup
 	// 启动组件函数
 	startComponent := func(runner func(context.Context, chan error)) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			runner(shutdownCtx, errChan)
+			runner(ctx, errChan)
 		}()
 	}
 	// 启动所有组件
-	if p.debugServer != nil {
-		startComponent(p.debugServer.Run)
-	}
-	if p.dnsSevers != nil {
-		startComponent(p.dnsSevers.Run)
-	}
-	if p.mtlsAgent != nil {
-		startComponent(p.mtlsAgent.Run)
-	}
-	if p.metricServer != nil {
-		startComponent(p.metricServer.Run)
-	}
-	if p.rlsSvr != nil {
-		startComponent(p.rlsSvr.Run)
-	}
+	startComponent(p.debugServer.Run)
+	startComponent(p.dnsSevers.Run)
+	startComponent(p.mtlsAgent.Run)
+	startComponent(p.metricServer.Run)
+	startComponent(p.rlsSvr.Run)
 	// 等待所有组件退出或收到关闭信号
 	select {
 	case err := <-errChan:
 		if err != nil {
 			log.Errorf("[bootstrap] component failed: %v, initiating shutdown", err)
-			cancel() // 通知所有组件关闭
+			return err
 		}
 	case <-ctx.Done():
 		log.Infof("[bootstrap] received shutdown signal")
@@ -116,7 +104,7 @@ func (p *Agent) runServices(ctx context.Context) error {
 		wg.Wait()
 		close(done)
 	}()
-	// 带超时等待
+	// 等待30秒钟，如果所有组件都未能正常关闭，则强制退出
 	select {
 	case <-done:
 		log.Infof("[bootstrap] all components shutdown gracefully")

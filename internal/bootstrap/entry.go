@@ -12,6 +12,11 @@ import (
 
 // Start the main agent routines
 func Start(configFilePath string, bootConfig *config.BootConfig) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("[bootstrap] agent panic recovered: %v", r)
+		}
+	}()
 	agent, err := initAgent(configFilePath, bootConfig)
 	if err != nil {
 		log.Errorf("[bootstrap] fail to init sidecar server, err: %v", err)

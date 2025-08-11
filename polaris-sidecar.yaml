@@ -9,9 +9,6 @@ logger:
   rotation_max_backups: 10
   rotation_max_age: 7
   output_level: info
-debugger:
-  enable: false
-  port: 30000
 polaris:
   addresses:
     - ${POLARIS_ADDRESS}
@@ -22,26 +19,9 @@ polaris:
         region: ${REGION}
         zone: ${ZONE}
         campus: ${CAMPUS}
-      # - type: remoteHttp
-      #   region: http://127.0.0.1/region
-      #   zone: http://127.0.0.1/zone
-      #   campus: http://127.0.0.1/campus
 bind: 0.0.0.0
 port: 53
 namespace: default
-recurse: # 是否递归查询
-  enable: false
-  timeoutSec: 1
-mesh:
-  mtls: # mesh模式下，是否开启mtls
-    enable: false
-  metrics: # mesh模式下，是否开启metrics
-    enable: false
-    type: pull
-    metricPort: 0
-  ratelimit: # mesh模式下，是否开启ratelimit
-    enable: false
-    network: unix
 resolvers:
   - name: dnsagent # 默认dnsagent
     dns_ttl: 10
@@ -56,3 +36,19 @@ resolvers:
       reload_interval_sec: 30
       dns_answer_ip: 10.4.4.4
       recursion_available: true
+recurse: # 查询北极星失败时，是否递归查询，虚机环境设置 false，容器环境设置 true
+  enable: false
+  timeoutSec: 1
+mesh:
+  mtls: # mesh模式下，是否开启mtls
+    enable: false
+  metrics: # mesh模式下，是否开启metrics
+    enable: false
+    type: pull
+    metricPort: 0
+  ratelimit: # mesh模式下，是否开启ratelimit
+    enable: false
+    network: unix
+debugger: # 开发调试
+  enable: true
+  port: 50000

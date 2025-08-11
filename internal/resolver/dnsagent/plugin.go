@@ -54,6 +54,10 @@ func (r *resolverDiscovery) Name() string {
 	return name
 }
 
+func (r *resolverDiscovery) String() string {
+	return utils.JsonString(r)
+}
+
 // Initialize will init the resolver on startup
 func (r *resolverDiscovery) Initialize(c *common.ConfigEntry) error {
 	var err error
@@ -78,7 +82,7 @@ func (r *resolverDiscovery) Initialize(c *common.ConfigEntry) error {
 
 // Start the plugin runnable
 func (r *resolverDiscovery) Start(context.Context) {
-
+	log.Infof("[dnsagent] %s resolver started, resolver data:%s", name, r.String())
 }
 
 func (r *resolverDiscovery) Debugger() []debughttp.DebugHandler {
