@@ -109,8 +109,8 @@ func (s *SidecarConfig) InitPolarisApi() error {
 	return nil
 }
 
-// InitDnsServers initializes the DNS servers based on the configuration.
-func (s *SidecarConfig) InitDnsServers() (*resolver.Server, error) {
+// InitDnsResolver initializes the DNS servers based on the configuration.
+func (s *SidecarConfig) InitDnsResolver() (*resolver.Server, error) {
 	resolveConfig := &common.ResolverConfig{
 		BindIP:    s.Bind,
 		BindPort:  uint32(s.Port),

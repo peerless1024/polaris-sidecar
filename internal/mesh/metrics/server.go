@@ -62,13 +62,16 @@ const (
 	ticketDuration    = 30 * time.Second
 )
 
-func (s *Server) Run(ctx context.Context, errChan chan error) {
+func (s *Server) Run(ctx context.Context, wg *sync.WaitGroup, errChan chan error) {
 	if s == nil {
+		log.Infof("[envoy-metrics] metric server is nil, skip running")
 		return
 	}
 	log.Info("[envoy-metrics] start metric server")
+	wg.Add(1)
 	defer func() {
 		s.Destroy()
+		wg.Done()
 	}()
 	var err error
 	s.consumer, err = polaris.GetConsumerAPI()

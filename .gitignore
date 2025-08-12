@@ -20,3 +20,4 @@ goimports-reviser
 
 polaris-sidecar-release_*
 log/
+polaris/

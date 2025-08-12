@@ -25,6 +25,7 @@ import (
 
 	"github.com/miekg/dns"
 
+	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 )
 
@@ -122,7 +123,7 @@ func newLocalDNSServer(dnsTtl uint32, recursionAvailable bool) (*LocalDNSServer,
 }
 
 func (h *LocalDNSServer) ServeDNS(ctx context.Context, question *dns.Question, qname string) *dns.Msg {
-	var response *dns.Msg
+	protocol := ctx.Value(constants.ContextProtocol)
 	lp := h.lookupTable.Load()
 	if lp == nil {
 		return nil
@@ -135,14 +136,16 @@ func (h *LocalDNSServer) ServeDNS(ctx context.Context, question *dns.Question, q
 	answers, hostFound := lookupTable.lookupHost(question.Qtype, question.Name, hostname)
 
 	if hostFound {
-		response = new(dns.Msg)
+		response := new(dns.Msg)
 		response.Authoritative = true
 		// https://github.com/coredns/coredns/issues/3835
 		response.RecursionAvailable = h.recursionAvailable
 		response.Answer = answers
 		response.Rcode = dns.RcodeSuccess
+		log.Infof("[mesh] DNS lookup for %s found %d answers, protocol:%s", qname, len(answers), protocol)
 		return response
 	}
+	log.Errorf("[mesh] DNS lookup for %s not found, protocol:%s", qname, protocol)
 	return nil
 }
 

@@ -30,6 +30,7 @@ import (
 
 	debughttp "github.com/polarismesh/polaris-sidecar/internal/debugger"
 	"github.com/polarismesh/polaris-sidecar/internal/resolver/common"
+	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 	polarisApi "github.com/polarismesh/polaris-sidecar/pkg/polaris"
 	"github.com/polarismesh/polaris-sidecar/pkg/utils"
@@ -82,7 +83,7 @@ func (r *resolverDiscovery) Initialize(c *common.ConfigEntry) error {
 
 // Start the plugin runnable
 func (r *resolverDiscovery) Start(context.Context) {
-	log.Infof("[dnsagent] %s resolver started, resolver data:%s", name, r.String())
+	log.Infof("[dnsagent] %s resolver started", name)
 }
 
 func (r *resolverDiscovery) Debugger() []debughttp.DebugHandler {
@@ -123,7 +124,9 @@ func canDoResolve(qType uint16) bool {
 //
 // * NOTIMP (dns.RcodeNotImplemented)
 func (r *resolverDiscovery) ServeDNS(ctx context.Context, question dns.Question, qname string) *dns.Msg {
+	protocol := ctx.Value(constants.ContextProtocol)
 	if !canDoResolve(question.Qtype) {
+		log.Errorf("[dnsagent] unsupported question type %d, protocol: %s", question.Qtype, protocol)
 		return nil
 	}
 
@@ -143,10 +146,7 @@ func (r *resolverDiscovery) ServeDNS(ctx context.Context, question dns.Question,
 	}
 
 	instances, err := r.lookupFromPolaris(qname, r.namespace)
-	if err != nil {
-		return nil
-	}
-	if instances == nil {
+	if err != nil || len(instances) == 0 {
 		return nil
 	}
 
@@ -166,6 +166,7 @@ func (r *resolverDiscovery) ServeDNS(ctx context.Context, question dns.Question,
 func (r *resolverDiscovery) lookupFromPolaris(qname string, currentNs string) ([]model.Instance, error) {
 	svcKey := utils.ParseQname(qname, r.suffix, currentNs)
 	if nil == svcKey {
+		log.Errorf("[dnsagent] fail to parse qname %s, namespace: %s, suffix:%s", qname, currentNs, r.suffix)
 		return nil, nil
 	}
 	request := &polaris.GetOneInstanceRequest{}
@@ -179,7 +180,7 @@ func (r *resolverDiscovery) lookupFromPolaris(qname string, currentNs string) ([
 		log.Errorf("[dnsagent] fail to lookup service %s, err: %v", *svcKey, err)
 		return nil, err
 	}
-
+	log.Infof("[dnsagent] lookup service %s success, resp: %v", *svcKey, resp.String())
 	return resp.GetInstances(), nil
 }
 

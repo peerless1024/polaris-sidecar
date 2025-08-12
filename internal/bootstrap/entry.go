@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"sync"
+	"time"
 
 	"github.com/polarismesh/polaris-sidecar/internal/bootstrap/config"
 	"github.com/polarismesh/polaris-sidecar/internal/bootstrap/system"
@@ -23,15 +25,25 @@ func Start(configFilePath string, bootConfig *config.BootConfig) {
 		os.Exit(-1)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	errCh := make(chan error)
-	go func() {
-		err = agent.runServices(ctx)
-		if nil != err {
-			log.Errorf("[bootstrap] agent return for err: %v", err)
-			errCh <- err
-		}
-	}()
+	errCh := agent.getErrorChannel()
+	wg := &sync.WaitGroup{}
+	agent.runServices(ctx, wg, errCh)
 	runMainLoop(cancel, errCh)
+	<-ctx.Done()
+	log.Info("[bootstrap] sidecar server start shutdown")
+	// 等待所有组件完成关闭
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	// 等待30秒钟，如果所有组件都未能正常关闭，则强制退出
+	select {
+	case <-done:
+		log.Infof("[bootstrap] all components shutdown gracefully")
+	case <-time.After(30 * time.Second):
+		log.Warnf("[bootstrap] graceful shutdown timed out, forcing exit")
+	}
 }
 
 // RunMainLoop sidecar server main loop
@@ -43,7 +55,6 @@ func runMainLoop(cancel context.CancelFunc, errCh chan error) {
 			log.Errorf("[bootstrap] catch panic: %v", r)
 		}
 		log.Infof("[bootstrap] sink logs and stop sidecar server")
-		_ = log.Sync()
 	}()
 	signal.Notify(ch, system.Signals...)
 	for {

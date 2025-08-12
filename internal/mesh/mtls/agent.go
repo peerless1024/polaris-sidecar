@@ -61,13 +61,16 @@ func New(opt Option) (*Agent, error) {
 	return a, nil
 }
 
-func (a *Agent) Run(ctx context.Context, errChan chan error) {
+func (a *Agent) Run(ctx context.Context, wg *sync.WaitGroup, errChan chan error) {
 	if a == nil {
+		log.Infof("[envoy-mtls] agent is nil, skip run")
 		return
 	}
 	log.Info("[envoy-mtls] start mtls agent")
+	wg.Add(1)
 	defer func() {
 		a.Destroy()
+		wg.Done()
 	}()
 	// start sds grpc service
 	a.sds.Serve(a.grpcSvr)

@@ -88,13 +88,16 @@ type Server struct {
 	once         sync.Once
 }
 
-func (svr *Server) Run(ctx context.Context, errChan chan error) {
+func (svr *Server) Run(ctx context.Context, wg *sync.WaitGroup, errChan chan error) {
 	if svr == nil {
+		log.Infof("[resolver] resolver is nil, return")
 		return
 	}
 	log.Infof("[resolver] start to run resolver")
+	wg.Add(1)
 	defer func() {
 		svr.Destroy()
+		wg.Done()
 	}()
 	for _, handler := range svr.resolvers {
 		handler.Start(ctx)

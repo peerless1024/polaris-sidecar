@@ -16,6 +16,7 @@ func WriteDnsCode(protocol string, w dns.ResponseWriter, r *dns.Msg, code int) {
 	msg.Truncate(size(protocol, r))
 	if edns := r.IsEdns0(); edns != nil {
 		setEDNS(r, msg, true)
+		log.Infof("[resolver] write dns response message with edns0")
 	}
 	err := w.WriteMsg(msg)
 	if nil != err {

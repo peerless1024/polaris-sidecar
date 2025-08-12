@@ -33,6 +33,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 	polarisApi "github.com/polarismesh/polaris-sidecar/pkg/polaris"
 )
@@ -58,13 +59,16 @@ type RateLimitServer struct {
 	once      sync.Once
 }
 
-func (svr *RateLimitServer) Run(ctx context.Context, errChan chan error) {
+func (svr *RateLimitServer) Run(ctx context.Context, wg *sync.WaitGroup, errChan chan error) {
 	if svr == nil {
+		log.Infof("[envoy-rls] ratelimit server is nil, skip run")
 		return
 	}
 	log.Info("[envoy-rls] start ratelimit server")
+	wg.Add(1)
 	defer func() {
 		svr.Destroy()
+		wg.Done()
 	}()
 	if svr.conf.Network == "unix" {
 		if err := os.MkdirAll(filepath.Dir(svr.conf.Address), os.ModePerm); err != nil {
@@ -133,10 +137,9 @@ func (svr *RateLimitServer) Destroy() {
 	})
 }
 
-const MaxUint32 = uint32(1<<32 - 1)
-
 func (svr *RateLimitServer) ShouldRateLimit(ctx context.Context, req *pb.RateLimitRequest) (*pb.RateLimitResponse, error) {
-	log.Info("[envoy-rls] receive ratelimit request", zap.Any("req", req))
+	protocol := ctx.Value(constants.ContextProtocol)
+	log.Info("[envoy-rls] receive ratelimit request", zap.Any("req", req), zap.Any("protocol", protocol))
 	acquireQuota := req.GetHitsAddend()
 	if acquireQuota == 0 {
 		acquireQuota = 1

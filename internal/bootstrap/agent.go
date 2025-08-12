@@ -20,7 +20,6 @@ package bootstrap
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/polarismesh/polaris-sidecar/internal/bootstrap/config"
 	debughttp "github.com/polarismesh/polaris-sidecar/internal/debugger"
@@ -33,7 +32,7 @@ import (
 
 // Agent provide the listener to dns server
 type Agent struct {
-	dnsSevers    *resolver.Server
+	dnsResolver  *resolver.Server
 	debugServer  *debughttp.DebugServer
 	metricServer *metrics.Server
 	mtlsAgent    *mtlsAgent.Agent
@@ -54,11 +53,11 @@ func initAgent(configFilePath string, bootConfig *config.BootConfig) (*Agent, er
 	if err = sidecarConfig.InitPolarisApi(); err != nil {
 		return nil, err
 	}
-	agent.dnsSevers, err = sidecarConfig.InitDnsServers()
+	agent.dnsResolver, err = sidecarConfig.InitDnsResolver()
 	if err != nil {
 		return nil, err
 	}
-	agent.debugServer, err = sidecarConfig.InitDebugServer(agent.dnsSevers)
+	agent.debugServer, err = sidecarConfig.InitDebugServer(agent.dnsResolver)
 	if err != nil {
 		return nil, err
 	}
@@ -71,47 +70,23 @@ func initAgent(configFilePath string, bootConfig *config.BootConfig) (*Agent, er
 	return agent, nil
 }
 
-func (p *Agent) runServices(ctx context.Context) error {
-	errChan := p.getErrorChannel()
-	var wg sync.WaitGroup
-	// 启动组件函数
-	startComponent := func(runner func(context.Context, chan error)) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			runner(ctx, errChan)
-		}()
-	}
+func (p *Agent) runServices(ctx context.Context, wg *sync.WaitGroup, errChan chan error) {
 	// 启动所有组件
-	startComponent(p.debugServer.Run)
-	startComponent(p.dnsSevers.Run)
-	startComponent(p.mtlsAgent.Run)
-	startComponent(p.metricServer.Run)
-	startComponent(p.rlsSvr.Run)
-	// 等待所有组件退出或收到关闭信号
-	select {
-	case err := <-errChan:
-		if err != nil {
-			log.Errorf("[bootstrap] component failed: %v, initiating shutdown", err)
-			return err
-		}
-	case <-ctx.Done():
-		log.Infof("[bootstrap] received shutdown signal")
+	if p.debugServer != nil {
+		go p.debugServer.Run(ctx, wg, errChan)
 	}
-	// 等待所有组件完成关闭
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-	// 等待30秒钟，如果所有组件都未能正常关闭，则强制退出
-	select {
-	case <-done:
-		log.Infof("[bootstrap] all components shutdown gracefully")
-	case <-time.After(30 * time.Second):
-		log.Warnf("[bootstrap] graceful shutdown timed out, forcing exit")
+	if p.dnsResolver != nil {
+		go p.dnsResolver.Run(ctx, wg, errChan)
 	}
-	return nil
+	if p.mtlsAgent != nil {
+		go p.mtlsAgent.Run(ctx, wg, errChan)
+	}
+	if p.metricServer != nil {
+		go p.metricServer.Run(ctx, wg, errChan)
+	}
+	if p.rlsSvr != nil {
+		go p.rlsSvr.Run(ctx, wg, errChan)
+	}
 }
 
 func (p *Agent) getErrorChannel() chan error {
@@ -120,8 +95,8 @@ func (p *Agent) getErrorChannel() chan error {
 	if p.debugServer != nil {
 		componentCount++
 	}
-	if p.dnsSevers != nil {
-		componentCount++
+	if p.dnsResolver != nil {
+		componentCount = componentCount + 2
 	}
 	if p.mtlsAgent != nil {
 		componentCount++

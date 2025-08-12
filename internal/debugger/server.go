@@ -33,12 +33,15 @@ func NewDebugServer(bind string, port int32) *DebugServer {
 	}
 }
 
-func (s *DebugServer) Run(ctx context.Context, errChan chan error) {
+func (s *DebugServer) Run(ctx context.Context, wg *sync.WaitGroup, errChan chan error) {
 	if s == nil {
+		log.Info("[debug-server] debug server is nil, skip run")
 		return
 	}
-	log.Info("start debug server")
+	wg.Add(1)
+	log.Info("[debug-server] start debug server")
 	defer func() {
+		wg.Done()
 		s.Destroy()
 	}()
 	ln, err := net.Listen(constants.TcpProtocol, fmt.Sprintf("%s:%d", s.bind, s.port))
@@ -49,7 +52,7 @@ func (s *DebugServer) Run(ctx context.Context, errChan chan error) {
 	}
 	mux, ok := s.svr.Handler.(*http.ServeMux)
 	if !ok {
-		log.Errorf("debug server handler is not debugger.ServeMux")
+		log.Errorf("[debug-server] debug server handler is not debugger.ServeMux")
 		errChan <- fmt.Errorf("debug server handler is not debugger.ServeMux")
 		return
 	}

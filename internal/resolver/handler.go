@@ -57,14 +57,14 @@ func (d *dnsHandler) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	// questions type we only accept
 	question := req.Question[0]
 	qname := d.Preprocess(question.Name)
-	log.Infof("[resolver] input question name %s, after Preprocess name %s", question.Name, qname)
+	log.Infof("[resolver] qname %s, raw req：%s", qname, req.String())
 	ctx := context.WithValue(context.Background(), constants.ContextProtocol, d.protocol)
 	var resp *dns.Msg
 	for _, handler := range d.resolvers {
 		resp = handler.ServeDNS(ctx, question, qname)
 		if nil != resp {
 			common.WriteDnsResponse(d.protocol, w, req, resp)
-			log.Infof("[resolver] request %v, response for %s is %v", req.String(), question.Name, resp)
+			log.Infof("[resolver] response for %s is %v", question.Name, resp.String())
 			return
 		}
 	}
@@ -73,7 +73,7 @@ func (d *dnsHandler) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		d.recurseProxy.HandleDNS(d.protocol, w, req)
 	} else {
 		common.WriteDnsCode(d.protocol, w, req, dns.RcodeServerFailure)
-		log.Errorf("[resolver] empty result from polaris, recurse is not enabled, request %v, response for %s is nil",
-			req.String(), question.Name)
+		log.Errorf("[resolver] empty result from polaris, recurse is not enabled, response code: %s for:%s",
+			dns.RcodeToString[dns.RcodeServerFailure], question.Name)
 	}
 }

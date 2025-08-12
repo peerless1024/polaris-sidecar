@@ -24,6 +24,7 @@ import (
 	"github.com/polarismesh/polaris-go/pkg/model"
 
 	"github.com/polarismesh/polaris-sidecar/pkg/constants"
+	"github.com/polarismesh/polaris-sidecar/pkg/log"
 )
 
 // ParseQname parse the qname into service and suffix
@@ -32,6 +33,7 @@ func ParseQname(qname string, suffix string, currentNs string) *model.ServiceKey
 	var matched bool
 	qname, matched = MatchSuffix(qname, suffix)
 	if !matched {
+		log.Infof("[utils] parse qname %s failed, suffix %s not match", qname, suffix)
 		return nil
 	}
 	qname = RemoveQuota(qname)
