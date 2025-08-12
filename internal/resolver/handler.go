@@ -29,7 +29,6 @@ type dnsHandler struct {
 
 // Preprocess removes the search suffix from the query name if it is present.
 func (d *dnsHandler) Preprocess(qname string) string {
-	log.Debugf("[resolver] input question name %s", qname)
 	if d.recurseProxy == nil || len(d.recurseProxy.GetSearch()) == 0 {
 		return qname
 	}
@@ -63,24 +62,37 @@ func (d *dnsHandler) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 	// questions type we only accept
 	question := req.Question[0]
-	qname := d.Preprocess(question.Name)
-	log.Infof("[resolver] qname %s, raw req：%s", qname, req.String())
-	ctx := context.WithValue(context.Background(), constants.ContextProtocol, d.protocol)
-	var resp *dns.Msg
-	for _, handler := range d.resolvers {
-		resp = handler.ServeDNS(ctx, question, qname)
-		if nil != resp {
-			common.WriteDnsResponse(d.protocol, w, req, resp)
-			log.Infof("[resolver] response for %s is %v", question.Name, resp.String())
-			return
+	if canDoResolve(question.Qtype) {
+		qname := d.Preprocess(question.Name)
+		log.Infof("[resolver] qname %s, raw question name：%s", qname, question.Name)
+		ctx := context.WithValue(context.Background(), constants.ContextProtocol, d.protocol)
+		for _, handler := range d.resolvers {
+			resp := handler.ServeDNS(ctx, question, qname)
+			if nil != resp {
+				common.WriteDnsResponse(d.protocol, w, req, resp)
+				return
+			}
 		}
 	}
-	if d.recurseProxy != nil {
-		// 降级到本地 nameserver
-		d.recurseProxy.HandleDNS(d.protocol, w, req)
-	} else {
-		common.WriteDnsCode(d.protocol, w, req, dns.RcodeServerFailure)
-		log.Errorf("[resolver] empty result from polaris, recurse is not enabled, response code: %s for:%s",
-			dns.RcodeToString[dns.RcodeServerFailure], question.Name)
+	// 降级到本地 nameserver
+	resp := d.recurseProxy.HandleDNS(d.protocol, w, req)
+	if nil != resp {
+		common.WriteDnsResponse(d.protocol, w, req, resp)
+		return
 	}
+	common.WriteDnsCode(d.protocol, w, req, dns.RcodeServerFailure)
+}
+
+func canDoResolve(qType uint16) bool {
+	if qType == dns.TypeA {
+		return true
+	}
+	if qType == dns.TypeAAAA {
+		return true
+	}
+	if qType == dns.TypeSRV {
+		return true
+	}
+
+	return false
 }

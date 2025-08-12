@@ -9,10 +9,8 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/polarismesh/polaris-sidecar/internal/resolver/common"
 	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
-	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
 type Proxy struct {
@@ -51,7 +49,11 @@ func (r *RotatingUpstream) Next() string {
 }
 
 // HandleDNS 降级到本地代理处理DNS请求
-func (p *Proxy) HandleDNS(protocol string, w dns.ResponseWriter, r *dns.Msg) {
+func (p *Proxy) HandleDNS(protocol string, w dns.ResponseWriter, r *dns.Msg) *dns.Msg {
+	if p == nil {
+		log.Infof("[recursor] recursor is not configured, return nil")
+		return nil
+	}
 	startTime := time.Now()
 	clientAddr := w.RemoteAddr()
 	q := r.Question[0]
@@ -60,14 +62,9 @@ func (p *Proxy) HandleDNS(protocol string, w dns.ResponseWriter, r *dns.Msg) {
 	if _, isTCP := clientAddr.(*net.TCPAddr); isTCP {
 		network = constants.TcpProtocol
 	}
-	// 延迟记录日志
-	defer func() {
-		log.Infof("[recursor] question: (%s), protocol: %s, latency: %s, client_addr: %s, client_network: %s, "+
-			"config:%s", q.String(), protocol, time.Since(startTime).String(), clientAddr.String(),
-			clientAddr.Network(), p.config.String())
-	}()
 	// 根据 ndots 和 search 配置生成带解析域名列表
 	domains := p.expandQuery(q.Name)
+	log.Infof("[recursor] expand query for %s, get domains: %v", q.Name, domains)
 	// 创建DNS客户端
 	client := &dns.Client{Net: network, Timeout: time.Duration(p.config.Timeout) * time.Second}
 	// 开始解析
@@ -77,33 +74,27 @@ func (p *Proxy) HandleDNS(protocol string, w dns.ResponseWriter, r *dns.Msg) {
 		// 尝试请求配置的DNS服务器
 		for i := 0; i < p.config.Attempts; i++ {
 			upstream := p.rotate.Next()
-			r, rtt, err := client.Exchange(req, upstream)
-			resInfo := fmt.Sprintf("upstream: %s, req: %s, rtt: %s, err:%v, resp:%s", upstream, req.String(), rtt,
-				err, getDnsMsg(r))
-
+			resp, rtt, err := client.Exchange(req, upstream)
+			resInfo := fmt.Sprintf("upstream: %s, rtt: %s, err:%v, question: %s, code:%s，protocol: %s,"+
+				"client_addr: %s, network:%s, latency: %s", upstream, rtt, err, req.Question[0].String(),
+				getDnsMsgCode(r), protocol, clientAddr.String(), network, time.Since(startTime).String())
 			switch {
-			case r != nil && !(r.Rcode == dns.RcodeSuccess || r.Rcode == dns.RcodeNameError):
+			case resp != nil && !(resp.Rcode == dns.RcodeSuccess || resp.Rcode == dns.RcodeNameError):
 				// 如果返回的响应码不是NOERROR（0查询成功）或者NXDOMAIN（3域名不存在），则仅记录日志，尝试下一个DNS服务器
 				log.Warnf("[recursor] need retry for dns rcode not pass, info:%s", resInfo)
-			case err == nil || (r != nil && r.Truncated):
+			case err == nil || (resp != nil && resp.Truncated):
 				// 如果没有错误，或者有错误但是响应被截断，都返回响应，并退出循环
 				// 客户端如果感知到响应被截断，会自动切换成 TCP 协议重试
-				if err = w.WriteMsg(r); err != nil {
-					log.Warnf("[recursor] failed to respond to client: %v", err)
-				}
 				log.Infof("[recursor] return for query succeeded, info:%s, ", resInfo)
-				return
+				return resp
 			default:
 				log.Warnf("[recursor] need retry for query failed, info:%s", resInfo)
 			}
-			log.Errorf("nameserver %s query %s failed (try %d times): %v", upstream, domain, i+1, err)
+			log.Errorf("nameserver %s query %s failed (try %d times), err:%v, config:%s", upstream, domain, i+1, err,
+				p.config.String())
 		}
 	}
-	// If all resolvers fail, return a SERVFAIL message
-	log.Errorf("[recursor] question: %s, protocol: %s, latency: %s, client_addr: %s, client_network: %s, domains:%s",
-		q.String(), protocol, time.Since(startTime).String(), clientAddr.String(), clientAddr.Network(),
-		utils.JsonString(domains))
-	common.WriteDnsCode(protocol, w, r, dns.RcodeServerFailure)
+	return nil
 }
 
 func (p *Proxy) expandQuery(name string) []string {
@@ -119,9 +110,9 @@ func (p *Proxy) expandQuery(name string) []string {
 	return []string{name}
 }
 
-func getDnsMsg(r *dns.Msg) string {
+func getDnsMsgCode(r *dns.Msg) string {
 	if r == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("code:%s, msg:%s", dns.RcodeToString[r.Rcode], r.String())
+	return fmt.Sprintf("code:%s", dns.RcodeToString[r.Rcode])
 }

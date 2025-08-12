@@ -1,6 +1,8 @@
 package recursor
 
 import (
+	"fmt"
+
 	"github.com/miekg/dns"
 
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
@@ -63,7 +65,7 @@ func (r *Config) fillByResolvConfig(dnsConfig *dns.ClientConfig) {
 func (r *Config) mergeUpstream(bindLocalhost bool, nameServerMap map[string]bool, nameServers []string) {
 	for _, nameServer := range nameServers {
 		if _, ok := nameServerMap[nameServer]; !ok && !needSkip(bindLocalhost, nameServer) {
-			r.Upstream = append(r.Upstream, nameServer)
+			r.Upstream = append(r.Upstream, fmt.Sprintf("%s:53", nameServer))
 			nameServerMap[nameServer] = true
 		}
 	}

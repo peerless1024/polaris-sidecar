@@ -137,9 +137,6 @@ func (h *LocalDNSServer) ServeDNS(ctx context.Context, question *dns.Question, q
 
 	if hostFound {
 		response := new(dns.Msg)
-		response.Authoritative = true
-		// https://github.com/coredns/coredns/issues/3835
-		response.RecursionAvailable = h.recursionAvailable
 		response.Answer = answers
 		response.Rcode = dns.RcodeSuccess
 		log.Infof("[mesh] DNS lookup for %s found %d answers, protocol:%s", qname, len(answers), protocol)

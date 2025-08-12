@@ -7,6 +7,7 @@ import (
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
 )
 
+// WriteDnsCode 失败时返回响应码
 func WriteDnsCode(protocol string, w dns.ResponseWriter, r *dns.Msg, code int) {
 	msg := &dns.Msg{}
 	msg.SetReply(r)
@@ -18,18 +19,26 @@ func WriteDnsCode(protocol string, w dns.ResponseWriter, r *dns.Msg, code int) {
 		setEDNS(r, msg, true)
 		log.Infof("[resolver] write dns response message with edns0")
 	}
+	log.Errorf("[resolver] dns resolve failed, code: %s, req:%s, resp:%s",
+		dns.RcodeToString[code], r.String(), msg.String())
 	err := w.WriteMsg(msg)
 	if nil != err {
 		log.Errorf("[resolver] fail to write dns response message, err: %v", err)
 	}
 }
 
+// WriteDnsResponse 成功时返回响应
 func WriteDnsResponse(protocol string, w dns.ResponseWriter, r *dns.Msg, msg *dns.Msg) {
 	msg.SetReply(r)
+	msg.Authoritative = true
+	// nslookup 默认会发送递归请求，这里需要设置为可递归, 否则会导致nslookup请求失败
+	msg.RecursionAvailable = true
 	msg.Truncate(size(protocol, r))
 	if edns := r.IsEdns0(); edns != nil {
 		setEDNS(r, msg, true)
 	}
+	log.Infof("[resolver] dns resolve succeed, code: %s, req:%s, resp:%s",
+		dns.RcodeToString[msg.Rcode], r.String(), msg.String())
 	err := w.WriteMsg(msg)
 	if nil != err {
 		log.Errorf("[resolver] fail to write dns response message, err: %v", err)

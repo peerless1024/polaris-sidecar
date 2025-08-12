@@ -47,11 +47,23 @@ bash tool/p.sh
 bash tool/stop.sh
 ```
 ### 验证
+#### 验证请求北极星的域名
 - dig
 ```shell
 dig polaris.checker.polaris
+dig www.baidu.com
 ```
-- nslookup
+- 没有dig命令时，使用nslookup
 ```shell
 nslookup polaris.checker.polaris
+nslookup www.baidu.com
+```
+- 通过 SRV 类型获取 IP 和端口
+```shell
+dig SRV polaris.checker.polaris +short | awk '{print $4 ":" $3}' | while read line; do host=${line%:*}; port=${line#*:}; dig +short $host | awk -v p=$port '{print $1 ":" p}'; done
+```
+#### 验证请求本地 nameserver的所有类型
+- 观察是否全部都是 NOERROR
+```shell
+bash test/run_dns_queries.sh
 ```

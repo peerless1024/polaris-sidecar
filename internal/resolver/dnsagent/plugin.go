@@ -98,20 +98,6 @@ func (r *resolverDiscovery) Destroy() {
 	}
 }
 
-func canDoResolve(qType uint16) bool {
-	if qType == dns.TypeA {
-		return true
-	}
-	if qType == dns.TypeAAAA {
-		return true
-	}
-	if qType == dns.TypeSRV {
-		return true
-	}
-
-	return false
-}
-
 // ServeDNS is like dns.Handler except ServeDNS may return an rcode
 // and/or error.
 // If ServeDNS writes to the response body, it should return a status
@@ -125,10 +111,6 @@ func canDoResolve(qType uint16) bool {
 // * NOTIMP (dns.RcodeNotImplemented)
 func (r *resolverDiscovery) ServeDNS(ctx context.Context, question dns.Question, qname string) *dns.Msg {
 	protocol := ctx.Value(constants.ContextProtocol)
-	if !canDoResolve(question.Qtype) {
-		log.Errorf("[dnsagent] unsupported question type %d, protocol: %s", question.Qtype, protocol)
-		return nil
-	}
 
 	msg := &dns.Msg{}
 	labels := dns.SplitDomainName(qname)
@@ -141,6 +123,7 @@ func (r *resolverDiscovery) ServeDNS(ctx context.Context, question dns.Question,
 			}
 			rr := r.markRecord(question, net.IP(ret), nil)
 			msg.Answer = append(msg.Answer, rr)
+			log.Infof("[dnsagent] serve dns for %s, protocol: %s, ip: %s", qname, protocol, net.IP(ret).String())
 			return msg
 		}
 	}
@@ -157,7 +140,6 @@ func (r *resolverDiscovery) ServeDNS(ctx context.Context, question dns.Question,
 		msg.Answer = append(msg.Answer, rr)
 	}
 
-	msg.Authoritative = true
 	msg.Rcode = dns.RcodeSuccess
 
 	return msg

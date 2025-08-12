@@ -36,8 +36,8 @@ resolvers:
       reload_interval_sec: 30
       dns_answer_ip: 10.4.4.4
       recursion_available: true
-recurse: # 查询北极星失败时，是否递归查询
-  enable: false
+recurse: # 查询北极星失败时，是否递归查询本地 nameserver，容器环境需要开启
+  enable: true
   timeoutSec: 1
 mesh:
   mtls: # mesh模式下，是否开启mtls
