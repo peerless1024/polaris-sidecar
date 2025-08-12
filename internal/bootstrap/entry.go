@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -16,7 +17,8 @@ import (
 func Start(configFilePath string, bootConfig *config.BootConfig) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("[bootstrap] agent panic recovered: %v", r)
+			stack := debug.Stack()
+			log.Errorf("[bootstrap] bootstrap panic recovered: %v\nStack trace:\n%s", r, string(stack))
 		}
 	}()
 	agent, err := initAgent(configFilePath, bootConfig)
@@ -52,9 +54,11 @@ func runMainLoop(cancel context.CancelFunc, errCh chan error) {
 	defer func() {
 		signal.Stop(ch)
 		if r := recover(); r != nil {
-			log.Errorf("[bootstrap] catch panic: %v", r)
+			stack := debug.Stack()
+			log.Errorf("[bootstrap] bootstrap panic recovered: %v\nStack trace:\n%s", r, string(stack))
 		}
 		log.Infof("[bootstrap] sink logs and stop sidecar server")
+		_ = log.Sync()
 	}()
 	signal.Notify(ch, system.Signals...)
 	for {

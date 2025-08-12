@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"runtime/debug"
 	"strings"
 
 	"github.com/miekg/dns"
@@ -49,6 +50,12 @@ func (d *dnsHandler) Preprocess(qname string) string {
 
 // ServeDNS handler callback
 func (d *dnsHandler) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			stack := debug.Stack()
+			log.Errorf("[resolver] agent panic recovered: %v\nStack trace:\n%s", r, string(stack))
+		}
+	}()
 	// questions length is 0, send refused
 	if len(req.Question) == 0 {
 		common.WriteDnsCode(d.protocol, w, req, dns.RcodeRefused)

@@ -36,7 +36,7 @@ resolvers:
       reload_interval_sec: 30
       dns_answer_ip: 10.4.4.4
       recursion_available: true
-recurse: # 查询北极星失败时，是否递归查询，虚机环境设置 false，容器环境设置 true
+recurse: # 查询北极星失败时，是否递归查询
   enable: false
   timeoutSec: 1
 mesh:
