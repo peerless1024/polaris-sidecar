@@ -50,8 +50,12 @@ all: fmt build
 
 ##@ Build
 .PHONY: build
-build: ## Build binary and tarball.
+build: clean ## Build binary and tarball.
 	bash ./build.sh $(VERSION)
+
+.PHONY: pkg
+pkg: clean ## Build release package.
+	bash ./build_vm.sh $(VERSION)
 
 .PHONY: build-docker
 build-docker: ## Build polaris-server docker images.
@@ -61,9 +65,7 @@ build-docker: ## Build polaris-server docker images.
 .PHONY: clean
 clean: ## Clean polaris-server make data.
 	@rm -f polaris-sidecar
-	@rm -rf polaris-sidecar-release_*
-	@rm -rf polaris-sidecar-arm64
-	@rm -rf polaris-sidecar-amd64
+	@rm -rf polaris-sidecar-*
 
 ##@ Test
 .PHONY: test

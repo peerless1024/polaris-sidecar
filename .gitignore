@@ -19,5 +19,7 @@ style_tool/
 goimports-reviser
 
 polaris-sidecar-release_*
+polaris-sidecar-local_*
 log/
 polaris/
+polaris-sidecar-install/
