@@ -48,14 +48,10 @@ bash tool/stop.sh
 ```
 ### 验证
 #### 验证请求北极星的域名
-- dig
-```shell
-dig polaris.checker.polaris
-dig www.baidu.com
-```
-- 没有dig命令时，使用nslookup
+- 使用nslookup
 ```shell
 nslookup polaris.checker.polaris
+# recurse 开启和关闭时均成功
 nslookup www.baidu.com
 ```
 - 通过 SRV 类型获取 IP 和端口

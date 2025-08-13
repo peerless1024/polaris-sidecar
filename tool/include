@@ -29,9 +29,8 @@ function start() {
     set +e
     ulimit -n 409600
 	set -e
-    nohup $cmdline >>./log/stdout 2>&1 &
-#    nohup $cmdline >>/dev/null 2>&1 &
-
+#    nohup $cmdline >>./log/stdout 2>&1 &
+    nohup $cmdline >>/dev/null 2>&1 &
 }
 
 function stop() {
@@ -56,6 +55,7 @@ function reload() {
 
 function add_cron() {
     set +e
+    chmod +x "$workdir/tool/check.sh"
     item="$workdir/tool/check.sh >>$workdir/log/check.log 2>&1"
     exist=$(crontab -l | grep "$item" | grep -v "#" | wc -l)
     if [ "$exist" == "0" ]; then
