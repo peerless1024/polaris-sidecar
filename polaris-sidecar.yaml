@@ -50,5 +50,5 @@ mesh:
     enable: false
     network: unix
 debugger: # 开发调试
-  enable: true
+  enable: false
   port: 50000

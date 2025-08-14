@@ -103,7 +103,7 @@ func (p *Proxy) expandQuery(name string) []string {
 	if strings.Count(name, constants.DotSymbol) < ndots {
 		expanded := make([]string, 0, len(search))
 		for _, suffix := range search {
-			expanded = append(expanded, name+constants.DotSymbol+suffix)
+			expanded = append(expanded, name+suffix)
 		}
 		return expanded
 	}
