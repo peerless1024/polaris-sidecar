@@ -1,66 +1,55 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-if [ $# -gt 0 ]; then
-  version="$1"
-else
-  # MacOS compatible timestamp generation
-  if [[ "$(uname)" == "Darwin" ]]; then
-    currentTimeStamp=$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date '+%Y-%m-%d %H:%M:%S')" +%s)
-    version="${currentTimeStamp}"
-  else
-    current=`date "+%Y-%m-%d %H:%M:%S"`
-    timeStamp=`date -d "$current" +%s`
-    currentTimeStamp=$(((timeStamp*1000+10#`date "+%N"`/1000000)/1000))
-    version="$currentTimeStamp"
-  fi
-fi
+# 获取脚本所在目录（兼容软链接）
+workdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
-workdir=$(dirname $(realpath $0))
+# 使用UNIX时间戳作为版本号（跨平台兼容）
+version=${1:-$(date +%s)}
+
+# 设置构建参数
+GOOS=${GOOS:-$(go env GOOS)}
+GOARCH=${GOARCH:-$(go env GOARCH)}
 bin_name="polaris-sidecar"
-if [ "${GOOS}" == "" ]; then
-  GOOS=$(go env GOOS)
-fi
-if [ "${GOARCH}" == "" ]; then
-  GOARCH=$(go env GOARCH)
-fi
+[[ "$GOOS" == "windows" ]] && bin_name="polaris-sidecar.exe"
+
 folder_name="polaris-sidecar-release_${version}.${GOOS}.${GOARCH}"
 pkg_name="${folder_name}.zip"
-if [ "${GOOS}" == "windows" ]; then
-  bin_name="polaris-sidecar.exe"
-fi
+
 echo "GOOS is ${GOOS}, GOARCH is ${GOARCH}, binary name is ${bin_name}"
 
-cd $workdir
+cd "$workdir" || exit 1
 
-# 清理环境
-rm -rf ${folder_name}
-rm -f "${pkg_name}"
+# 清理旧构建
+rm -rf "${folder_name}" "${pkg_name}" "${pkg_name}.md5sum" || true
 
-# 编译
-rm -f ${bin_name}
-
-# 禁止 CGO_ENABLED 参数打开
+# 编译二进制
 export CGO_ENABLED=0
-
 build_date=$(date "+%Y%m%d.%H%M%S")
 package="github.com/polarismesh/polaris-sidecar/version"
-GOARCH=${GOARCH} GOOS=${GOOS} go build -o ${bin_name} -ldflags="-X ${package}.Version=${version} -X ${package}.BuildDate=${build_date}"
 
-# 设置程序为可执行
-chmod +x ${bin_name}
+GOARCH=${GOARCH} GOOS=${GOOS} go build -o "${bin_name}" \
+  -ldflags="-X ${package}.Version=${version} -X ${package}.BuildDate=${build_date}" || exit 1
 
-# 打包
-mkdir -p ${folder_name}
-cp ${bin_name} ${folder_name}
-cp polaris-sidecar.yaml ${folder_name}
-cp -r tool ${folder_name}/
-zip -r "${pkg_name}" ${folder_name}
-#md5sum ${pkg_name} > "${pkg_name}.md5sum"
+chmod +x "${bin_name}"
 
-if [[ $(uname -a | grep "Darwin" | wc -l) -eq 1 ]]; then
-  md5 ${pkg_name} >"${pkg_name}.md5sum"
+# 创建发布目录
+mkdir -p "${folder_name}" || exit 1
+cp "${bin_name}" polaris-sidecar.yaml "${folder_name}/" || exit 1
+cp -r tool "${folder_name}/" || exit 1
+
+# 压缩打包（-j参数去除目录结构）
+zip -j -r "${pkg_name}" "${folder_name}" || exit 1
+
+# 生成校验和
+if command -v md5sum &>/dev/null; then
+  md5sum "${pkg_name}" > "${pkg_name}.md5sum"
+elif command -v md5 &>/dev/null; then
+  md5 -r "${pkg_name}" > "${pkg_name}.md5sum"
 else
-  md5sum ${pkg_name} >"${pkg_name}.md5sum"
+  echo "Warning: md5sum/md5 command not found, skipping checksum generation"
 fi
+
+echo "Build successful: ${pkg_name}"
+exit 0  # 确保返回成功状态

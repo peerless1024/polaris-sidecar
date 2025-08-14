@@ -1,33 +1,72 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-DOCKER_IMAGE_RPO="${DOCKER_RPO}"
-if [[ "${DOCKER_RPO}" == "" ]]; then
-  DOCKER_IMAGE_RPO="polarismesh"
+# 设置Docker仓库，默认为polarismesh
+DOCKER_IMAGE_RPO="${DOCKER_RPO:-polarismesh}"
+push_image=true  # 默认推送镜像
+
+# 解析参数
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --no-push)
+            push_image=false
+            shift
+            ;;
+        *)
+            docker_tag="$1"
+            shift
+            ;;
+    esac
+done
+
+# 参数检查
+if [ -z "${docker_tag:-}" ]; then
+    echo "Usage: bash $0 [--no-push] <docker_tag>"
+    echo "e.g.: bash $0 v1.0"
+    echo "e.g.: bash $0 --no-push v1.0-rc1"
+    exit 1
 fi
 
-if [ $# != 1 ]; then
-  echo "e.g.: bash $0 v1.0"
-  exit 1
+echo "Building Docker image: ${DOCKER_IMAGE_RPO}/polaris-sidecar:${docker_tag}"
+$push_image || echo "Skipping image push (--no-push specified)"
+
+# 确保在脚本所在目录执行
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+cd "$script_dir"
+
+# 构建二进制
+bash build.sh "${docker_tag}" || {
+    echo "Error: Failed to build polaris-sidecar binary" >&2
+    exit 1
+}
+
+# 构建Docker镜像
+docker build --network=host -t "${DOCKER_IMAGE_RPO}/polaris-sidecar:${docker_tag}" . || {
+    echo "Error: Docker build failed" >&2
+    exit 1
+}
+
+# 推送镜像（如果未指定--no-push）
+if $push_image; then
+    docker push "${DOCKER_IMAGE_RPO}/polaris-sidecar:${docker_tag}" || {
+        echo "Error: Docker push failed" >&2
+        exit 1
+    }
+
+    # 如果是正式版本，则同时标记为latest并推送
+    if [[ ! "$docker_tag" =~ alpha|beta|rc ]]; then
+        echo "Tagging as latest version"
+        docker tag "${DOCKER_IMAGE_RPO}/polaris-sidecar:${docker_tag}" "${DOCKER_IMAGE_RPO}/polaris-sidecar:latest"
+        docker push "${DOCKER_IMAGE_RPO}/polaris-sidecar:latest" || {
+            echo "Error: Failed to push latest tag" >&2
+            exit 1
+        }
+    fi
 fi
 
-docker_tag=$1
-
-echo "docker repository : ${DOCKER_IMAGE_RPO}/polaris-sidecar, tag : ${docker_tag}"
-
-bash build.sh ${docker_tag}
-
-if [ $? != 0 ]; then
-  echo "build polaris-sidecar failed"
-  exit 1
+echo "Docker build completed successfully"
+if $push_image; then
+    echo "Image pushed to registry"
 fi
-
-docker build --network=host -t ${DOCKER_IMAGE_RPO}/polaris-sidecar:${docker_tag} ./
-docker push ${DOCKER_IMAGE_RPO}/polaris-sidecar:${docker_tag}
-
-pre_release=$(echo ${docker_tag} | egrep "(alpha|beta|rc)" | wc -l)
-if [ ${pre_release} == 0 ]; then
-  docker tag ${DOCKER_IMAGE_RPO}/polaris-sidecar:${docker_tag} ${DOCKER_IMAGE_RPO}/polaris-sidecar:latest
-  docker push ${DOCKER_IMAGE_RPO}/polaris-sidecar:latest
-fi
+exit 0  # 确保返回成功状态

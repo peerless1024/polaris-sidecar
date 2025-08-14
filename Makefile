@@ -57,8 +57,12 @@ build: clean ## Build binary and tarball.
 pkg: clean ## Build release package.
 	bash ./build_vm.sh $(VERSION)
 
-.PHONY: build-docker
-build-docker: ## Build polaris-server docker images.
+.PHONY: image
+image: ## Build polaris-server docker images.
+	bash ./build_docker.sh $(IMAGE_TAG) --no-push
+
+.PHONY: image-push
+image-push: ## Build polaris-server docker images.
 	bash ./build_docker.sh $(IMAGE_TAG)
 
 ##@ Clean
