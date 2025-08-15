@@ -161,8 +161,8 @@ verify_installation() {
 }
 
 # 主安装流程
-install_polaris_sidecar
 configure_dns
+install_polaris_sidecar
 verify_installation
 
 echo "=== Installation Completed ==="
