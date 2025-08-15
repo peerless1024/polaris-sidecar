@@ -40,7 +40,7 @@ cp "${bin_name}" polaris-sidecar.yaml "${folder_name}/" || exit 1
 cp -r tool "${folder_name}/" || exit 1
 
 # 压缩打包（-j参数去除目录结构）
-zip -j -r "${pkg_name}" "${folder_name}" || exit 1
+zip -r "${pkg_name}" "${folder_name}" || exit 1
 
 # 生成校验和
 if command -v md5sum &>/dev/null; then
@@ -50,6 +50,9 @@ elif command -v md5 &>/dev/null; then
 else
   echo "Warning: md5sum/md5 command not found, skipping checksum generation"
 fi
+
+# 清理临时文件
+rm -rf "${folder_name}"
 
 echo "Build successful: ${pkg_name}"
 exit 0  # 确保返回成功状态
