@@ -11,6 +11,7 @@ import (
 
 	"github.com/polarismesh/polaris-sidecar/pkg/constants"
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
+	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
 type Proxy struct {
@@ -103,7 +104,7 @@ func (p *Proxy) expandQuery(name string) []string {
 	if strings.Count(name, constants.DotSymbol) < ndots {
 		expanded := make([]string, 0, len(search))
 		for _, suffix := range search {
-			expanded = append(expanded, name+suffix)
+			expanded = append(expanded, utils.AddQuota(name+suffix))
 		}
 		return expanded
 	}
