@@ -159,10 +159,11 @@ func (r *resolverDiscovery) lookupFromPolaris(qname string, currentNs string) ([
 	}
 	resp, err := r.consumer.GetOneInstance(request)
 	if nil != err {
-		log.Errorf("[dnsagent] fail to lookup service %s, err: %v", *svcKey, err)
+		log.Errorf("[dnsagent] fail to lookup service %s, err: %v, req:%s", *svcKey, err, utils.JsonString(request))
 		return nil, err
 	}
-	log.Infof("[dnsagent] lookup service %s success, resp: %v", *svcKey, resp.String())
+	log.Infof("[dnsagent] lookup service %s success, resp: %v, req:%s", *svcKey, utils.JsonString(resp.GetInstances()),
+		utils.JsonString(request))
 	return resp.GetInstances(), nil
 }
 
