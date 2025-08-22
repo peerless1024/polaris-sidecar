@@ -1,10 +1,14 @@
 package constants
 
 const (
-	EnvPolarisAddress   = "POLARIS_ADDRESS"
-	EnvSidecarBind      = "SIDECAR_BIND"
-	EnvSidecarPort      = "SIDECAR_PORT"
-	EnvSidecarNamespace = "SIDECAR_NAMESPACE"
+	EnvPolarisAddress          = "POLARIS_ADDRESS"
+	EnvSidecarBind             = "SIDECAR_BIND"
+	EnvSidecarPort             = "SIDECAR_PORT"
+	EnvSidecarNamespace        = "SIDECAR_NAMESPACE"
+	EnvSidecarRegion           = "SIDECAR_REGION"
+	EnvSidecarZone             = "SIDECAR_ZONE"
+	EnvSidecarCampus           = "SIDECAR_CAMPUS"
+	EnvSidecarNearbyMatchLevel = "SIDECAR_NEARBY_MATCH_LEVEL"
 	// recurse env
 	EnvSidecarRecurseEnable  = "SIDECAR_RECURSE_ENABLE"
 	EnvSidecarRecurseTimeout = "SIDECAR_RECURSE_TIMEOUT"

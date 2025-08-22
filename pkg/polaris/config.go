@@ -27,6 +27,7 @@ type Config struct {
 	Addresses          []string `yaml:"addresses"`
 	Metrics            *Metrics
 	LocationConfigImpl *config.LocationConfigImpl
+	NearbyMatchLevel   string
 }
 
 type Metrics struct {

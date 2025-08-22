@@ -44,13 +44,10 @@ polaris:
   location:
     providers:
       - type: local
-        region: ${REGION}
-        zone: ${ZONE}
-        campus: ${CAMPUS}
-      # - type: remoteHttp
-      #   region: http://127.0.0.1/region
-      #   zone: http://127.0.0.1/zone
-      #   campus: http://127.0.0.1/campus
+        options:
+          region: ${REGION}
+          zone: ${ZONE}
+          campus: ${CAMPUS}
 bind: 0.0.0.0
 port: 53
 namespace: default
@@ -99,6 +96,24 @@ func TestParseYamlConfig(t *testing.T) {
 		t.Fatal("answer ip should be " + testAnswerIP)
 	}
 
+}
+
+const testRegion = "ap-guangzhou"
+
+func TestParseYamlConfigRegion(t *testing.T) {
+	err := os.Setenv("REGION", testRegion)
+	if nil != err {
+		t.Fatal(err)
+	}
+	cfg := &SidecarConfig{}
+	err = parseYamlContent([]byte(testCfg), cfg)
+	if nil != err {
+		t.Fatal(err)
+	}
+	result := cfg.PolarisConfig.Location.GetProviders()[0].GetOptions()["region"]
+	if result != testRegion {
+		t.Fatal("region should be " + testRegion)
+	}
 }
 
 const value = "this is a ${animal}, today is ${today}"

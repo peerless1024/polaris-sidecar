@@ -15,9 +15,11 @@ polaris:
   location:
     providers:
       - type: local
-        region: ${REGION}
-        zone: ${ZONE}
-        campus: ${CAMPUS}
+        options:
+          region: ${REGION}
+          zone: ${ZONE}
+          campus: ${CAMPUS}
+  nearby_match_level: campus
 bind: 0.0.0.0
 port: 53
 namespace: default

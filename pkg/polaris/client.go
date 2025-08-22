@@ -28,6 +28,7 @@ import (
 	"github.com/polarismesh/polaris-go/plugin/metrics/prometheus"
 
 	"github.com/polarismesh/polaris-sidecar/pkg/log"
+	"github.com/polarismesh/polaris-sidecar/pkg/utils"
 )
 
 var (
@@ -60,11 +61,20 @@ func InitPolarisContext(conf *Config) error {
 	if conf.LocationConfigImpl != nil {
 		sdkCfg.Global.Location = conf.LocationConfigImpl
 	}
+	if conf.NearbyMatchLevel != "" {
+		sdkCfg.Consumer.ServiceRouter.GetNearbyConfig().SetMatchLevel(conf.NearbyMatchLevel)
+	}
 	sdkCtx, err := polarisgo.NewSDKContextByConfig(sdkCfg)
 	if err != nil {
 		log.Errorf("fail to create polaris SDKContext, err: %v", err)
 		return err
 	}
+	// 获取位置提供者配置
+	locationProviders := sdkCtx.GetConfig().GetGlobal().GetLocation().GetProviders()[0]
+	routerChain := sdkCtx.GetConfig().GetConsumer().GetServiceRouter().GetChain()
+	matchLevel := sdkCtx.GetConfig().GetConsumer().GetServiceRouter().GetNearbyConfig().GetMatchLevel()
+	log.Infof("Using location provider: %s, chain:%s, matchLevel:%s", utils.JsonString(locationProviders),
+		utils.JsonString(routerChain), matchLevel)
 	SDKContext = sdkCtx
 	return nil
 }

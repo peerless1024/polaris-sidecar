@@ -69,7 +69,7 @@ image-push: ## Build polaris-server docker images.
 .PHONY: clean
 clean: ## Clean polaris-server make data.
 	@rm -f polaris-sidecar
-	@rm -rf polaris-sidecar-*
+	@rm -rf log logs polaris polaris-sidecar-*
 
 ##@ Test
 .PHONY: test

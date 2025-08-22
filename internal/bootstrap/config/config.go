@@ -25,6 +25,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	sdkconf "github.com/polarismesh/polaris-go/pkg/config"
+	sdkloc "github.com/polarismesh/polaris-go/plugin/location"
 	"gopkg.in/yaml.v3"
 
 	"github.com/polarismesh/polaris-sidecar/internal/debugger"
@@ -56,8 +57,28 @@ type SidecarConfig struct {
 }
 
 type PolarisConfig struct {
-	Addresses []string                    `yaml:"addresses"`
-	Location  *sdkconf.LocationConfigImpl `yaml:"location"`
+	Addresses        []string                    `yaml:"addresses"`
+	Location         *sdkconf.LocationConfigImpl `yaml:"location"`
+	NearbyMatchLevel string                      `yaml:"nearby_match_level"`
+}
+
+func (p *PolarisConfig) setLocationConfig(providerConfig *sdkconf.LocationProviderConfigImpl) {
+	if p.Location == nil {
+		p.Location = &sdkconf.LocationConfigImpl{
+			Providers: make([]*sdkconf.LocationProviderConfigImpl, 0),
+		}
+	}
+	if p.Location.Providers == nil {
+		p.Location.Providers = make([]*sdkconf.LocationProviderConfigImpl, 0)
+	}
+	for index, provider := range p.Location.Providers {
+		if provider.Type == providerConfig.Type {
+			p.Location.Providers[index] = providerConfig
+			return
+		}
+	}
+	p.Location.Providers = append(p.Location.Providers, providerConfig)
+	return
 }
 
 type RecurseConfig struct {
@@ -91,6 +112,7 @@ func (s *SidecarConfig) InitPolarisApi() error {
 	polarisApiConf := &polaris.Config{
 		Addresses:          s.PolarisConfig.Addresses,
 		LocationConfigImpl: s.PolarisConfig.Location,
+		NearbyMatchLevel:   s.PolarisConfig.NearbyMatchLevel,
 	}
 	if s.isMeshMetricsEnabled() {
 		polarisApiConf.Metrics = &polaris.Metrics{
@@ -214,6 +236,8 @@ func (s *SidecarConfig) mergeEnv() {
 	s.Port = getEnvIntValue(constants.EnvSidecarPort, s.Port)
 	s.Namespace = getEnvStringValue(constants.EnvSidecarNamespace, s.Namespace)
 	s.PolarisConfig.Addresses = getEnvStringsValue(constants.EnvPolarisAddress, s.PolarisConfig.Addresses)
+	s.PolarisConfig.NearbyMatchLevel = getEnvStringValue(constants.EnvSidecarNearbyMatchLevel, s.PolarisConfig.NearbyMatchLevel)
+	s.mergeLocationEnv()
 	s.Recurse.Enable = getEnvBoolValue(constants.EnvSidecarRecurseEnable, s.Recurse.Enable)
 	s.Recurse.TimeoutSec = getEnvIntValue(constants.EnvSidecarRecurseTimeout, s.Recurse.TimeoutSec)
 	s.Logger.RotateOutputPath = getEnvStringValue(constants.EnvSidecarLogRotateOutputPath, s.Logger.RotateOutputPath)
@@ -254,6 +278,23 @@ func (s *SidecarConfig) mergeEnv() {
 	s.MeshConfig.Metrics.Enable = getEnvBoolValue(constants.EnvSidecarMetricEnable, s.MeshConfig.Metrics.Enable)
 	s.MeshConfig.Metrics.Port = getEnvIntValue(constants.EnvSidecarMetricListenPort, s.MeshConfig.Metrics.Port)
 	log.Infof("[config] sidecar config merged with env: \n%s", s.String())
+}
+
+func (s *SidecarConfig) mergeLocationEnv() {
+	region := getEnvStringValue(constants.EnvSidecarRegion, "")
+	zone := getEnvStringValue(constants.EnvSidecarZone, "")
+	campus := getEnvStringValue(constants.EnvSidecarCampus, "")
+	if region == "" && zone == "" && campus == "" {
+		return
+	}
+	s.PolarisConfig.setLocationConfig(&sdkconf.LocationProviderConfigImpl{
+		Type: sdkloc.Local,
+		Options: map[string]interface{}{
+			areaRegion: region,
+			areaZone:   zone,
+			areaCampus: campus,
+		},
+	})
 }
 
 func (s *SidecarConfig) mergeBootConfig(config *BootConfig) error {
@@ -312,46 +353,6 @@ func (s *SidecarConfig) mergeBootConfig(config *BootConfig) error {
 	log.Infof("[config] sidecar config merged with bootstrap config: \n%s", s.String())
 	if err = errs.ErrorOrNil(); err != nil {
 		log.Errorf("[config] fail to merge bootstrap config to sidecar config, err: %v", errs.ErrorOrNil())
-		return err
-	}
-	return nil
-}
-
-func (s *SidecarConfig) verify() error {
-	var errs multierror.Error
-	if len(s.Bind) == 0 {
-		errs.Errors = append(errs.Errors, fmt.Errorf("host should not empty"))
-	}
-	if s.Port <= 0 {
-		errs.Errors = append(errs.Errors, fmt.Errorf("port should greater than 0"))
-	}
-	if s.Recurse.TimeoutSec <= 0 {
-		errs.Errors = append(errs.Errors, fmt.Errorf("recurse.timeout should greater than 0"))
-	}
-	if len(s.Resolvers) == 0 {
-		errs.Errors = append(errs.Errors, fmt.Errorf("you should at least config one resolver"))
-	}
-	for idx, resolverConfig := range s.Resolvers {
-		if len(resolverConfig.Name) == 0 {
-			errs.Errors = append(errs.Errors, fmt.Errorf("resolver %d config name is empty", idx))
-		}
-		if resolverConfig.DnsTtl < 0 {
-			errs.Errors = append(errs.Errors, fmt.Errorf("resolver %d config dnsttl should greater or equals to 0",
-				idx))
-		}
-		if resolverConfig.Enable {
-			if resolverConfig.Name == common.PluginNameDnsAgent {
-				s.DnsEnabled = true
-			} else if resolverConfig.Name == common.PluginNameMeshProxy {
-				s.MeshEnabled = true
-			}
-		}
-	}
-	if !s.DnsEnabled && !s.MeshEnabled {
-		errs.Errors = append(errs.Errors, fmt.Errorf("you should at least enable one resolver"))
-	}
-	if err := errs.ErrorOrNil(); err != nil {
-		log.Errorf("[config] sidecar config verify failed: %v", err)
 		return err
 	}
 	return nil
