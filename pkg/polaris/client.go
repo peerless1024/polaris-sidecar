@@ -69,10 +69,20 @@ func InitPolarisContext(conf *Config) error {
 		log.Errorf("fail to create polaris SDKContext, err: %v", err)
 		return err
 	}
-	// 获取位置提供者配置
-	locationProviders := sdkCtx.GetConfig().GetGlobal().GetLocation().GetProviders()[0]
-	routerChain := sdkCtx.GetConfig().GetConsumer().GetServiceRouter().GetChain()
-	matchLevel := sdkCtx.GetConfig().GetConsumer().GetServiceRouter().GetNearbyConfig().GetMatchLevel()
+	var locationProviders []*config.LocationProviderConfigImpl
+	if sdkCtx.GetConfig() != nil && sdkCtx.GetConfig().GetGlobal() != nil &&
+		sdkCtx.GetConfig().GetGlobal().GetLocation() != nil {
+		locationProviders = sdkCtx.GetConfig().GetGlobal().GetLocation().GetProviders()
+	}
+	var routerChain []string
+	var matchLevel string
+	if sdkCtx.GetConfig() != nil && sdkCtx.GetConfig().GetConsumer() != nil &&
+		sdkCtx.GetConfig().GetConsumer().GetServiceRouter() != nil {
+		routerChain = sdkCtx.GetConfig().GetConsumer().GetServiceRouter().GetChain()
+		if sdkCtx.GetConfig().GetConsumer().GetServiceRouter().GetNearbyConfig() != nil {
+			matchLevel = sdkCtx.GetConfig().GetConsumer().GetServiceRouter().GetNearbyConfig().GetMatchLevel()
+		}
+	}
 	log.Infof("Using location provider: %s, chain:%s, matchLevel:%s", utils.JsonString(locationProviders),
 		utils.JsonString(routerChain), matchLevel)
 	SDKContext = sdkCtx
