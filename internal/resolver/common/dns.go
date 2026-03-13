@@ -29,7 +29,10 @@ func WriteDnsCode(protocol string, w dns.ResponseWriter, r *dns.Msg, code int) {
 
 // WriteDnsResponse 成功时返回响应
 func WriteDnsResponse(protocol string, w dns.ResponseWriter, r *dns.Msg, msg *dns.Msg) {
+	// 保存原始响应码，因为 SetReply 会将 Rcode 重置为 NOERROR
+	originalRcode := msg.Rcode
 	msg.SetReply(r)
+	msg.Rcode = originalRcode
 	msg.Authoritative = true
 	// nslookup 默认会发送递归请求，这里需要设置为可递归, 否则会导致nslookup请求失败
 	msg.RecursionAvailable = true

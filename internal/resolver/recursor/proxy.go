@@ -69,6 +69,7 @@ func (p *Proxy) HandleDNS(protocol string, w dns.ResponseWriter, r *dns.Msg) *dn
 	// 创建DNS客户端
 	client := &dns.Client{Net: network, Timeout: time.Duration(p.config.Timeout) * time.Second}
 	// 开始解析
+	var lastNXDomainResp *dns.Msg
 	for _, domain := range domains {
 		req := r.Copy()
 		req.Question[0].Name = domain
@@ -78,10 +79,14 @@ func (p *Proxy) HandleDNS(protocol string, w dns.ResponseWriter, r *dns.Msg) *dn
 			resp, rtt, err := client.Exchange(req, upstream)
 			resInfo := fmt.Sprintf("upstream: %s, rtt: %s, err:%v, question: %s, code:%s，protocol: %s,"+
 				"client_addr: %s, network:%s, latency: %s", upstream, rtt, err, req.Question[0].String(),
-				getDnsMsgCode(r), protocol, clientAddr.String(), network, time.Since(startTime).String())
+				getDnsMsgCode(resp), protocol, clientAddr.String(), network, time.Since(startTime).String())
 			switch {
-			case resp != nil && !(resp.Rcode == dns.RcodeSuccess || resp.Rcode == dns.RcodeNameError):
-				// 如果返回的响应码不是NOERROR（0查询成功）或者NXDOMAIN（3域名不存在），则仅记录日志，尝试下一个DNS服务器
+			case resp != nil && resp.Rcode == dns.RcodeNameError:
+				// NXDOMAIN：域名不存在，记录日志并继续尝试下一个 search domain
+				log.Infof("[recursor] got NXDOMAIN for %s, try next search domain, info:%s", domain, resInfo)
+				lastNXDomainResp = resp
+			case resp != nil && resp.Rcode != dns.RcodeSuccess:
+				// 如果返回的响应码不是NOERROR（0查询成功），则仅记录日志，尝试下一个DNS服务器
 				log.Warnf("[recursor] need retry for dns rcode not pass, info:%s", resInfo)
 			case err == nil || (resp != nil && resp.Truncated):
 				// 如果没有错误，或者有错误但是响应被截断，都返回响应，并退出循环
@@ -91,9 +96,18 @@ func (p *Proxy) HandleDNS(protocol string, w dns.ResponseWriter, r *dns.Msg) *dn
 			default:
 				log.Warnf("[recursor] need retry for query failed, info:%s", resInfo)
 			}
+			if resp == nil || resp.Rcode == dns.RcodeNameError {
+				// NXDOMAIN 跳出 attempts 循环，直接尝试下一个 search domain
+				break
+			}
 			log.Errorf("nameserver %s query %s failed (try %d times), err:%v, config:%s", upstream, domain, i+1, err,
 				p.config.String())
 		}
+	}
+	// 所有 search domain 都返回 NXDOMAIN，返回最后一个 NXDOMAIN 响应
+	if lastNXDomainResp != nil {
+		log.Infof("[recursor] all search domains returned NXDOMAIN for %s", q.Name)
+		return lastNXDomainResp
 	}
 	return nil
 }
